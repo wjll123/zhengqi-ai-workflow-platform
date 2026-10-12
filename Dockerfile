@@ -40,7 +40,7 @@ RUN set -eux; \
       AUTH_PATH=$(echo "$NPM_REGISTRY_URL" | sed -E 's#^https?://##; s#^[^/]+##; s#/+$##'); \
       npm config set "//${AUTH_HOST}${AUTH_PATH}:_authToken" "$NPM_TOKEN"; \
       mkdir -p /opt/artifact && cd /opt/artifact && npm init -y >/dev/null 2>&1 \
-        && npm install @oai/artifact-tool; \
+        && npm install @oai/artifact-tool || echo "WARN: @oai/artifact-tool 安装失败（私有源不可达或令牌错误），月报将运行时降级，其余任务不受影响。"; \
     else \
       echo "WARN: 未提供 NPM_REGISTRY_URL / NPM_TOKEN，月报（4+2 收客保月报）将不可用，其余任务正常。"; \
     fi
