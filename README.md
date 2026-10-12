@@ -28,6 +28,10 @@ python3 -m venv .venv
 
 ### 发布到 GitHub / Render
 
+公开仓库：<https://github.com/wjll123/zhengqi-ai-workflow-platform>
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/wjll123/zhengqi-ai-workflow-platform)
+
 仓库带有 `render.yaml`，在 Render 中选择 **New → Blueprint** 并连接本仓库即可创建 Web 服务。Render 会使用 `gunicorn` 启动 Flask 应用，健康检查地址为 `/healthz`。也可以在 GitHub 仓库的 **Settings → Pages** 之外使用 Render，因为本项目需要运行 Python 后端。
 
 公开部署使用临时工作目录（`ZQC_DATA_DIR=/tmp/zqc-data`），重启或实例回收后上传的文件会消失。公开链接上的文件列表和计算接口是共享的，不能上传客户身份证号、收入明细等敏感数据；需要多人正式使用时，应在 Render 前增加登录认证，并为每个用户分配独立工作目录。
