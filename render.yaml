@@ -1,10 +1,9 @@
 services:
   - type: web
     name: zhengqi-ai-workflow
-    runtime: python
+    runtime: docker
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app.web_app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
     envVars:
       - key: ZQC_HOST
@@ -13,3 +12,11 @@ services:
         value: /tmp/zqc-data
       - key: ZQC_PUBLIC_DEPLOYMENT
         value: "1"
+      # 以下两个为私有 npm 源凭据，请在 Render 后台 Environment 中设置（构建期可用）：
+      #   NPM_REGISTRY_URL = https://<你的私有registry>/<path>/
+      #   NPM_TOKEN        = <私有源访问令牌>
+      # 不建议写死在仓库；若写在此处，请务必设置为 secret。
+      - key: NPM_REGISTRY_URL
+        sync: false
+      - key: NPM_TOKEN
+        sync: false

@@ -6,6 +6,15 @@ data/*
 data/**/*
 !data/**/
 !data/**/.gitkeep
+# 计算模板是月报的“算法本体”，不含客户数据，允许入库供 Render 直接使用；
+# 其余 data/（inbox、outputs、logs 等运行数据）继续排除。
+!data/templates/
+!data/templates/*.xlsx
+!data/templates/*.xls
+# 预置历史底稿（聚合表，非客户原始数据），用于公开链接上月报的续写；若不愿公开可删除本段与 data/seed 目录
+!data/seed/
+!data/seed/*.xlsx
+!data/seed/*.xls
 docs/**/*.xlsx
 docs/**/*.xls
 docs/**/*.pptx

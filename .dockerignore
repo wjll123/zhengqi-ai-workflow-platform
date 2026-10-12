@@ -1,7 +1,20 @@
 .git
-.gitignore
 .venv
-data
 __pycache__
 *.pyc
-docs/test-fixtures
+*.pyo
+node_modules
+**/.DS_Store
+*.log
+
+# 运行时数据目录不进构建上下文（公开部署用 /tmp/zqc-data，由 entrypoint 铺设）
+data/inbox
+data/outputs
+data/logs
+data/state
+data/trash
+data/config
+
+# 仅保留已提交的计算模板与预置历史底稿（聚合表，非客户原始数据）
+data/templates/**
+data/seed/**
