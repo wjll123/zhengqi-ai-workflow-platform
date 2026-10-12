@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}派单工作台 · 政企存量平台{% endblock %}
+{% block nav_dispatch %}on{% endblock %}
+{% block content %}
+<h1 class="page">派单工作台</h1>
+<p class="sub">准备双线质差派单，核对规定动作，登记智慧中台执行结果。</p>
+
+<div class="warn" style="margin-bottom:22px">
+  当前为离线辅助模式。此页面不会登录智慧中台、送审、执行或发送督办。只有在外部系统实际操作并核对后，才登记对应状态。
+</div>
+
+<div class="dgrid">
+  <section class="dpanel">
+    <h2>新建派单方案</h2>
+    <form id="new-plan">
+      <div class="dformgrid">
+        <label>工作流<select name="workflow" id="wf"><option value="customer">双线质差 · 直销客户级</option><option value="number">双线质差 · 政企用户号码级</option></select></label>
+        <label>派单方式<select name="method" id="method"></select></label>
+        <label>活动名称<input name="activity_name" required maxlength="160" placeholder="填写智慧中台活动名称"></label>
+        <label>客户群名称<input name="group_name" required maxlength="160" placeholder="与中台保存名称一致"></label>
+        <label>客群层级<select name="audience_level" id="audience"><option value="customer">客户级</option><option value="user">用户级</option></select></label>
+        <label>试算客群数量<input name="expected_count" type="number" min="1" max="100000000" required placeholder="中台试算显示的数量"></label>
+        <label>下发组织<input name="organization" maxlength="200" placeholder="按机构派发时必填"></label>
+        <label>操作人<input name="operator" required maxlength="100" placeholder="本次实际操作人"></label>
+      </div>
+      <label>方案概述<textarea name="summary" rows="2" maxlength="2000"></textarea></label>
+      <label>全局话术<textarea name="script" rows="2" maxlength="4000"></textarea></label>
+      <div class="dactions"><button class="btn" type="submit">创建方案</button><span id="create-msg" class="dmsg"></span></div>
+    </form>
+  </section>
+
+  <section class="dpanel">
+    <h2>派单方案</h2>
+    <div id="plan-list" class="dlist"><p class="empty">加载中…</p></div>
+  </section>
+</div>
+
+<section id="plan-detail" class="dpanel" style="display:none;margin-top:20px"></section>
+
+<style>
+  .dgrid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:18px;align-items:start}
+  .dpanel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px}
+  .dpanel h2{font-size:17px;margin-bottom:14px}
+  .dpanel h3{font-size:14px;margin:20px 0 9px}
+  .dformgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px 14px}
+  .dpanel label{display:block;font-size:12.5px;font-weight:600;color:var(--ink2);margin-bottom:10px}
+  .dpanel input,.dpanel select,.dpanel textarea{width:100%;margin-top:5px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;font:inherit;font-size:13px;color:var(--ink);background:#fff}
+  .dpanel textarea{resize:vertical}
+  .dactions{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px}
+  .dmsg{font-size:12.5px;color:var(--red)}
+  .dlist button{display:block;width:100%;text-align:left;padding:11px 12px;margin-top:8px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font:inherit}
+  .dlist button:hover,.dlist button.sel{border-color:var(--blue);background:var(--blue-bg)}
+  .dlist small{display:block;color:var(--ink3);margin-top:3px}
+  .dmeta{display:flex;gap:9px 18px;flex-wrap:wrap;color:var(--ink2);font-size:13px;margin:9px 0 15px}
+  .dmeta b{color:var(--ink)}
+  .dsteps{padding-left:23px;font-size:13px;color:var(--ink2)}
+  .dsteps li{padding:3px 0}
+  .dcheck{display:grid;grid-template-columns:23px minmax(0,1fr) minmax(140px,240px);gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line2)}
+  .dcheck label{margin:0;font-weight:400}
+  .dcheck input[type=checkbox]{width:17px;height:17px;margin:0;cursor:pointer}
+  .dcheck input[type=text]{margin:0}
+  .dcheck .optional{color:var(--ink3);font-size:11px;margin-left:5px}
+  .dstate{padding:12px 14px;border-radius:8px;background:#f7f9fc;color:var(--ink2);font-size:13px;margin:13px 0}
+  .dstate strong{color:var(--ink)}
+  .dhistory{font-size:12px;color:var(--ink3);padding-left:18px}
+  .dhistory li{padding:2px 0}
+  @media(max-width:850px){.dgrid{grid-template-columns:1fr}.dformgrid{grid-template-columns:1fr}.dcheck{grid-template-columns:23px 1fr}.dcheck input[type=text]{grid-column:2}}
+</style>
+
+<script>
+const statusLabels={draft:'准备中',prepared:'已完成预检',submitted:'已在中台送审',approved:'中台审批通过',executed:'中台已执行',refreshed:'已刷新任务数',verified:'已核对派单结果'};
+const nextLabels={prepared:'确认预检完成',submitted:'登记中台已送审',approved:'登记中台审批通过',executed:'登记中台已执行',refreshed:'登记任务数已刷新',verified:'登记派单结果已核对'};
+const methods={customer:['按责任客户经理','到认领包区（直销）','按机构'],number:['按责任客户经理','按机构']};
+let selectedId=null;
+function e(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function updateWorkflow(){
+  const wf=document.getElementById('wf').value, m=document.getElementById('method'), a=document.getElementById('audience');
+  m.innerHTML=methods[wf].map(x=>`<option value="${e(x)}">${e(x)}</option>`).join('');
+  a.innerHTML=wf==='number'?'<option value="customer">客户级</option>':'<option value="customer">客户级</option><option value="user">用户级</option>';
+}
+document.getElementById('wf').addEventListener('change',updateWorkflow);updateWorkflow();
+async function api(url,options){const r=await fetch(url,options);const d=await r.json();if(!r.ok)throw Error(d.error||'请求失败');return d}
+function post(url,data){return api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})}
+async function loadList(){
+  const plans=await api('/api/dispatch/plans');
+  document.getElementById('plan-list').innerHTML=plans.length?plans.map(p=>`<button data-id="${e(p.id)}" class="${p.id===selectedId?'sel':''}"><b>${e(p.activity_name)}</b><small>${e(statusLabels[p.status])} · ${e(p.method)} · ${e(p.operator)}</small></button>`).join(''):'<p class="empty">还没有派单方案</p>';
+}
+document.getElementById('new-plan').addEventListener('submit',async ev=>{
+  ev.preventDefault();const form=ev.target,msg=document.getElementById('create-msg');msg.textContent='';
+  const data=Object.fromEntries(new FormData(form).entries());
+  try{const p=await post('/api/dispatch/plans',data);selectedId=p.id;form.reset();updateWorkflow();await loadList();renderPlan(p)}
+  catch(err){msg.textContent=err.message}
+});
+document.getElementById('plan-list').addEventListener('click',async ev=>{
+  const b=ev.target.closest('button[data-id]');if(!b)return;selectedId=b.dataset.id;
+  try{renderPlan(await api('/api/dispatch/plans/'+encodeURIComponent(selectedId)));await loadList()}catch(err){alert(err.message)}
+});
+function renderPlan(p){
+  const box=document.getElementById('plan-detail');box.style.display='block';
+  const editable=p.status==='draft';
+  const checks=p.checks.filter(c=>c.required||c.code==='M8');
+  const checkHtml=checks.map(c=>`<div class="dcheck" data-code="${e(c.code)}"><input type="checkbox" ${c.checked?'checked':''} ${((c.code==='M8'&&p.status!=='executed')||(!editable&&c.code!=='M8'))?'disabled':''}><label><b>${e(c.code)}</b> ${e(c.label)}${c.required?'':'<span class="optional">执行后核对</span>'}</label><input type="text" value="${e(c.evidence)}" placeholder="${c.code==='M5'?'填写中台显示的目标客群数量':'核对依据或备注（可选）'}" maxlength="500" ${((c.code==='M8'&&p.status!=='executed')||(!editable&&c.code!=='M8'))?'disabled':''}></div>`).join('');
+  let fields='';
+  if(p.next_status==='submitted')fields='<label>智慧中台活动号<input id="external-id" maxlength="160" placeholder="在中台送审后填写" required></label>';
+  if(p.next_status==='verified')fields='<div class="dformgrid"><label>实际派单数<input id="actual-count" type="number" min="0" max="100000000" required></label><label>差异说明<input id="verify-note" maxlength="1000" placeholder="数量不一致时必填"></label></div>';
+  box.innerHTML=`<h2>${e(p.activity_name)}</h2><div class="dmeta"><span>流程：<b>${e(p.workflow_info.name)}</b></span><span>客群：<b>${e(p.group_name)}</b></span><span>试算量：<b>${e(p.expected_count)}</b></span><span>方式：<b>${e(p.method)}</b></span><span>操作人：<b>${e(p.operator)}</b></span>${p.organization?`<span>组织：<b>${e(p.organization)}</b></span>`:''}</div>
+  <div class="dstate">当前状态：<strong>${e(statusLabels[p.status])}</strong>。${p.status==='verified'?`中台查询实际派单 ${e(p.dispatched_count)}，与试算量${p.dispatched_count===p.expected_count?'一致':'不一致；'+e(p.note)}`:'状态仅依据操作人登记，平台尚未连接智慧中台。'}</div>
+  <div class="dactions"><a class="btn ghost sm" href="/api/dispatch/plans/${e(p.id)}/card">下载操作卡</a></div>
+  <h3>操作顺序</h3><ol class="dsteps">${p.workflow_info.steps.map(s=>`<li>${e(s)}</li>`).join('')}</ol>
+  <h3>规定动作核对</h3><p class="hint" style="margin-bottom:8px">由实际操作人对照中台页面确认。勾选记录不代表系统操作已完成。</p>${checkHtml}
+  <h3>流程登记</h3>${fields}<div class="dactions">${p.next_status?`<button class="btn" id="advance">${e(nextLabels[p.next_status])}</button>`:'<span class="tag g">流程已登记完成</span>'}<span id="detail-msg" class="dmsg"></span></div>
+  <div class="dstate" id="rpa-state">正在检查本机浏览器 RPA 条件…</div>
+  <div class="dactions" id="rpa-actions"></div>
+  <h3>操作记录</h3><ol class="dhistory">${p.events.map(x=>`<li>${e(x.at)} · ${e(x.detail)}</li>`).join('')}</ol>`;
+  box.dataset.id=p.id;box.dataset.next=p.next_status||'';
+  checkRpa(p);
+  box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function checkRpa(p){
+  const state=document.getElementById('rpa-state'), actions=document.getElementById('rpa-actions');
+  if(!state||!actions)return;
+  try{
+    const d=await api('/api/dispatch/plans/'+encodeURIComponent(p.id)+'/rpa-ready');
+    state.innerHTML=`本机 RPA：<strong>${e(d.ready?'已就绪':'不可执行')}</strong>。${e(d.message)}${d.ready?'（阶段：'+e(d.stage)+'）':''}`;
+    actions.innerHTML=d.ready?`<button class="btn" id="rpa-run">在已登录浏览器中执行本阶段</button><span class="hint">执行前请确认浏览器当前页面为目标系统。</span>`:'';
+  }catch(err){state.textContent='本机 RPA 检查失败：'+err.message;actions.innerHTML=''}
+}
+document.getElementById('plan-detail').addEventListener('change',async ev=>{
+  const row=ev.target.closest('.dcheck');if(!row)return;
+  const box=document.getElementById('plan-detail'),msg=document.getElementById('detail-msg');
+  const cb=row.querySelector('input[type=checkbox]'),txt=row.querySelector('input[type=text]');
+  try{const p=await post('/api/dispatch/plans/'+encodeURIComponent(box.dataset.id)+'/checks',{code:row.dataset.code,checked:cb.checked,evidence:txt.value});renderPlan(p)}
+  catch(err){msg.textContent=err.message;renderPlan(await api('/api/dispatch/plans/'+encodeURIComponent(box.dataset.id)))}
+});
+document.getElementById('plan-detail').addEventListener('click',async ev=>{
+  if(ev.target.id==='rpa-run'){
+    const box=document.getElementById('plan-detail'),msg=document.getElementById('detail-msg');
+    if(!confirm('请确认目标系统已在本机浏览器中登录，且当前操作会改变中台状态。继续执行本阶段吗？'))return;
+    ev.target.disabled=true;ev.target.textContent='执行中…';
+    try{const d=await post('/api/dispatch/plans/'+encodeURIComponent(box.dataset.id)+'/rpa-run',{stage:(await api('/api/dispatch/plans/'+encodeURIComponent(box.dataset.id)+'/rpa-ready')).stage});msg.textContent=d.message||'浏览器动作已执行，请核对中台状态'}catch(err){msg.textContent=err.message}
+    const p=await api('/api/dispatch/plans/'+encodeURIComponent(box.dataset.id));renderPlan(p);await loadList();return;
+  }
+  if(ev.target.id!=='advance')return;
+  const box=document.getElementById('plan-detail'),target=box.dataset.next,msg=document.getElementById('detail-msg');
+  const data={target};if(target==='submitted')data.external_activity_id=document.getElementById('external-id').value;
+  if(target==='verified'){data.dispatched_count=document.getElementById('actual-count').value;data.note=document.getElementById('verify-note').value}
+  if(target!=='prepared'&&!confirm('请确认此步骤已在智慧中台实际完成，是否登记？'))return;
+  try{const p=await post('/api/dispatch/plans/'+encodeURIComponent(box.dataset.id)+'/advance',data);renderPlan(p);await loadList()}
+  catch(err){msg.textContent=err.message}
+});
+loadList().catch(err=>{document.getElementById('plan-list').textContent=err.message});
+</script>
+{% endblock %}

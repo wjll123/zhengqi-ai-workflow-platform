@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}{{ task.name }} · 政企存量平台{% endblock %}
+
+{% block content %}
+<h1 class="page">{{ task.name }}</h1>
+<div class="sub">
+  <span class="tag">{{ task.module }}</span>
+  &nbsp;{{ task.description }}
+</div>
+
+{% if task.key == 'monthly_4plus2' %}
+<div class="card" style="cursor:default;max-width:860px;display:block;">
+  <div style="font-weight:700;margin-bottom:12px;">选择本账期四份源数据和两份计算模板</div>
+  <label for="monthlyBatch">账期（YYYYMM）</label>
+  <input id="monthlyBatch" inputmode="numeric" maxlength="6" style="display:block;width:130px;margin:7px 0 16px;padding:9px;">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px 18px;">
+    <label>客户级整体<select id="monthlyFull" class="monthly-source" style="display:block;width:100%;padding:9px;"></select></label>
+    <label>客户级存存量<select id="monthlyStock" class="monthly-source" style="display:block;width:100%;padding:9px;"></select></label>
+    <label>客户级存增量<select id="monthlyGrow" class="monthly-source" style="display:block;width:100%;padding:9px;"></select></label>
+    <label>业务级<select id="monthlyBusiness" class="monthly-source" style="display:block;width:100%;padding:9px;"></select></label>
+    <label>收保率对标分析模板<select id="monthlyBenchmarkTemplate" style="display:block;width:100%;padding:9px;"></select></label>
+    <label>指标跟踪模板<select id="monthlyTrackerTemplate" style="display:block;width:100%;padding:9px;"></select></label>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px;">
+    <label class="btn ghost sm" for="monthlyUpload">上传本账期源文件或计算模板</label>
+    <input id="monthlyUpload" type="file" accept=".xlsx" multiple style="display:none;">
+    <button class="btn sm" id="monthlyRun">生成四份成果</button>
+  </div>
+  <div class="hint" style="margin-top:10px;">两张计算模板默认选用平台预置版本，也可上传新版。指标跟踪表从平台保存的上月完整历史表续写，保留往年及前几个月的数据、小数位和标色；平台已保存 2026 年 8 月历史底稿，无需重复上传。若缺少连续月份底稿，会提示并停止生成。纯净收入剔除项沿用所选指标模板现有数值，请核对本账期口径。</div>
+  <div id="monthlyMsg" style="margin-top:12px;color:var(--ink3);font-size:13px;"></div>
+</div>
+<script>
+const monthlyIds = ['monthlyFull','monthlyStock','monthlyGrow','monthlyBusiness','monthlyBenchmarkTemplate','monthlyTrackerTemplate'];
+function monthlyEscape(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function monthlyFill(id,names,predicate){
+  const box=document.getElementById(id),old=box.value;
+  box.innerHTML='<option value="">请选择文件</option>'+names.map(n=>'<option value="'+monthlyEscape(n)+'">'+monthlyEscape(n)+'</option>').join('');
+  if(names.includes(old)) box.value=old;
+  else {const match=names.find(predicate); if(match)box.value=match;}
+}
+function monthlyTemplateFill(id,items,defaultName){
+  const box=document.getElementById(id),old=box.value;
+  box.innerHTML='<option value="">请选择模板</option>'+items.map(item=>
+    '<option value="'+monthlyEscape(item.value)+'">'+monthlyEscape(item.label)+'</option>').join('');
+  if(items.some(item=>item.value===old)) box.value=old;
+  else {const preferred=items.find(item=>item.value==='templates:'+defaultName);if(preferred)box.value=preferred.value;}
+}
+async function monthlyRefresh(){
+  const [inbox,templates]=await Promise.all([
+    fetch('/api/inbox').then(r=>r.json()),fetch('/api/templates').then(r=>r.json())]);
+  const inputs=inbox.files.filter(n=>n.toLowerCase().endsWith('.xlsx'));
+  const batch=document.getElementById('monthlyBatch').value.trim();
+  const short=batch.length===6?batch.slice(2):batch;
+  const current=n=>n.includes(batch)||n.includes(short);
+  monthlyFill('monthlyFull',inputs,n=>current(n)&&n.includes('客户级')&&!n.includes('存存量')&&!n.includes('存增量'));
+  monthlyFill('monthlyStock',inputs,n=>current(n)&&n.includes('存存量'));
+  monthlyFill('monthlyGrow',inputs,n=>current(n)&&n.includes('存增量'));
+  monthlyFill('monthlyBusiness',inputs,n=>current(n)&&n.includes('业务级'));
+  const templateItems=[...templates.names.filter(n=>n.toLowerCase().endsWith('.xlsx')).map(n=>({value:'templates:'+n,label:n+'（平台模板）',name:n})),
+    ...inputs.filter(n=>n.includes('模板')).map(n=>({value:'inbox:'+n,label:n+'（已上传）',name:n}))];
+  monthlyTemplateFill('monthlyBenchmarkTemplate',templateItems.filter(item=>item.name.includes('收保率')&&item.name.includes('模板')),'营销标签-收保率对标分析模板.xlsx');
+  monthlyTemplateFill('monthlyTrackerTemplate',templateItems.filter(item=>item.name.includes('指标跟踪')&&item.name.includes('模板')),'营销标签-指标跟踪模板.xlsx');
+}
+document.getElementById('monthlyUpload').addEventListener('change',async function(){
+  const fd=new FormData();for(const file of this.files)fd.append('files',file);
+  const msg=document.getElementById('monthlyMsg');msg.textContent='上传中…';
+  try{const d=await (await fetch('/api/upload',{method:'POST',body:fd})).json();
+    msg.textContent=d.ok?`${d.message}。请核对上方文件选择后点击“生成四份成果”。`:(d.error||'上传失败');
+    if(d.ok){await monthlyRefresh();for(const name of d.saved||[]){
+      if(name.includes('收保率')&&name.includes('模板'))document.getElementById('monthlyBenchmarkTemplate').value='inbox:'+name;
+      else if(name.includes('指标跟踪')&&name.includes('模板'))document.getElementById('monthlyTrackerTemplate').value='inbox:'+name;
+      else if(name.includes('存存量'))document.getElementById('monthlyStock').value=name;
+      else if(name.includes('存增量'))document.getElementById('monthlyGrow').value=name;
+      else if(name.includes('业务级'))document.getElementById('monthlyBusiness').value=name;
+      else if(name.includes('客户级'))document.getElementById('monthlyFull').value=name;
+    }}}
+  catch(e){msg.textContent='上传失败：'+e;}this.value='';
+});
+document.getElementById('monthlyBatch').addEventListener('change',monthlyRefresh);
+document.getElementById('monthlyRun').addEventListener('click',async function(){
+  const values=monthlyIds.map(id=>document.getElementById(id).value);
+  const msg=document.getElementById('monthlyMsg');
+  if(values.some(v=>!v)){
+    const labels=['客户级整体','客户级存存量','客户级存增量','业务级','收保率对标分析模板','指标跟踪模板'];
+    msg.textContent='缺少：'+labels.filter((_,i)=>!values[i]).join('、')+'。请选择文件上传，上传后在上方确认选择。';
+    document.getElementById('monthlyUpload').click();
+    return;
+  }
+  this.disabled=true;msg.textContent='正在计算和核对四份成果…';
+  const params={batch:document.getElementById('monthlyBatch').value.trim(),full:values[0],stock:values[1],grow:values[2],
+    business:values[3],benchmark_template:values[4],tracker_template:values[5]};
+  try{const d=await (await fetch('/api/run/monthly_4plus2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)})).json();
+    renderResult(document.getElementById('result'),d);msg.textContent=d.ok?'核对完成，可在下方下载四份成果。':(d.message||'执行失败');}
+  catch(e){msg.textContent='执行失败：'+e;}this.disabled=false;
+});
+fetch('/api/batch').then(r=>r.json()).then(d=>{document.getElementById('monthlyBatch').value=d.batch||'';monthlyRefresh();});
+</script>
+{% elif task.key == 'monthly_luozhe_audit' %}
+<div class="card" style="cursor:default;max-width:860px;display:block;">
+  <div style="font-weight:700;margin-bottom:12px;">选择本次核对的四份文件</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px 18px;">
+    <label>21 各地市落责统计来源<select id="lzStat" class="lz-file" style="display:block;width:100%;padding:9px;"></select></label>
+    <label>月度收入正增长客户数量<select id="lzGrowth" class="lz-file" style="display:block;width:100%;padding:9px;"></select></label>
+    <label>落责材料数据处理工作簿<select id="lzProcess" class="lz-file" style="display:block;width:100%;padding:9px;"></select></label>
+    <label>月报客户落责部分<select id="lzPpt" class="lz-file" style="display:block;width:100%;padding:9px;"></select></label>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px;">
+    <label class="btn ghost sm" for="lzUpload">上传四份文件</label>
+    <input id="lzUpload" type="file" accept=".xlsx,.pptx" multiple style="display:none;">
+    <button class="btn sm" id="lzRun">生成工作流对比报告</button>
+  </div>
+  <div class="hint" style="margin-top:10px;">请先确认四份文件属于同一统计期。平台只读核对，不修改原工作簿或月报。</div>
+  <div id="lzMsg" style="margin-top:12px;color:var(--ink3);font-size:13px;"></div>
+</div>
+<div class="grp" style="max-width:860px;margin-top:26px;">
+  <div class="grp-t">7 步工作流程</div>
+  <table><thead><tr><th>步骤</th><th>操作与核对</th></tr></thead><tbody>
+    <tr><td>1</td><td>地市总体落责来源更新全量统计；全省采用维度二。</td></tr>
+    <tr><td>2</td><td>落责来源与收入正增长来源更新全量收入正增长统计及 PPT 材料。</td></tr>
+    <tr><td>3</td><td>集团规上来源更新集团规上统计及 PPT 材料。</td></tr>
+    <tr><td>4</td><td>专精特新来源更新专精特新统计及 PPT 材料。</td></tr>
+    <tr><td>5</td><td>比对全量 PPT 材料与月报第 1 页，并复核页首总结。</td></tr>
+    <tr><td>6</td><td>比对集团规上 PPT 材料与月报第 2 页，并复核页首总结。</td></tr>
+    <tr><td>7</td><td>比对专精特新 PPT 材料与月报第 3 页，并复核页首总结。</td></tr>
+  </tbody></table>
+</div>
+<script>
+function lzEscape(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+async function lzRefresh(preferred=[]){
+  const inbox=await fetch('/api/inbox').then(r=>r.json());
+  const choices=[
+    ['lzStat','.xlsx',n=>n.includes('21各地市')&&n.includes('落责')],
+    ['lzGrowth','.xlsx',n=>n.includes('收入正增长')],
+    ['lzProcess','.xlsx',n=>n.includes('落责材料数据处理')],
+    ['lzPpt','.pptx',n=>n.includes('月报')&&n.includes('落责')]
+  ];
+  for(const [id,ext,pick] of choices){
+    const box=document.getElementById(id),old=box.value;
+    const names=inbox.files.filter(n=>n.toLowerCase().endsWith(ext));
+    box.innerHTML='<option value="">请选择文件</option>'+names.map(n=>'<option value="'+lzEscape(n)+'">'+lzEscape(n)+'</option>').join('');
+    const match=preferred.find(n=>names.includes(n)&&pick(n)) || (names.includes(old)?old:names.find(pick));
+    if(match)box.value=match;
+  }
+}
+document.getElementById('lzUpload').addEventListener('change',async function(){
+  const msg=document.getElementById('lzMsg'),fd=new FormData();
+  for(const file of this.files)fd.append('files',file);
+  msg.textContent='上传中…';
+  try{const d=await (await fetch('/api/upload',{method:'POST',body:fd})).json();
+    msg.textContent=d.message||d.error||'上传失败';if(d.ok)await lzRefresh(d.saved||[]);}
+  catch(e){msg.textContent='上传失败：'+e;}this.value='';
+});
+document.getElementById('lzRun').addEventListener('click',async function(){
+  const ids=['lzStat','lzGrowth','lzProcess','lzPpt'],values=ids.map(id=>document.getElementById(id).value);
+  const msg=document.getElementById('lzMsg');
+  if(values.some(v=>!v)){msg.textContent='请先选择四份文件';return;}
+  this.disabled=true;msg.textContent='正在核对四份文件…';
+  const params={stat_source:values[0],growth_source:values[1],process_book:values[2],report_ppt:values[3]};
+  try{const d=await (await fetch('/api/run/monthly_luozhe_audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params)})).json();
+    renderResult(document.getElementById('result'),d);msg.textContent=d.message||'核对失败';}
+  catch(e){msg.textContent='执行失败：'+e;}this.disabled=false;
+});
+lzRefresh();
+</script>
+{% elif task.key == 'monthly_report_ppt_tables' %}
+<div class="card" style="cursor:default;max-width:720px;display:block;">
+  <div style="font-weight:700;margin-bottom:12px;">选择本次输入</div>
+  <label for="pptSource">周报数据源（xlsx）</label>
+  <select id="pptSource" style="display:block;width:100%;margin:7px 0 16px;padding:9px;"></select>
+  <label for="pptTemplate">PPT 模板（pptx，同账期）</label>
+  <select id="pptTemplate" style="display:block;width:100%;margin:7px 0 16px;padding:9px;"></select>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+    <label class="btn ghost sm" for="pptUpload">增加新文件</label>
+    <input id="pptUpload" type="file" accept=".xlsx,.pptx" multiple style="display:none;">
+    <button class="btn sm" id="pptRun">更新 P11–14 表格</button>
+  </div>
+  <div id="pptMsg" style="margin-top:12px;color:var(--ink3);font-size:13px;"></div>
+</div>
+<script>
+function pptEscape(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+async function refreshPptChoices(preferred=[]){
+  const [inbox,templates] = await Promise.all([
+    fetch('/api/inbox').then(r=>r.json()),fetch('/api/templates').then(r=>r.json())]);
+  for(const [id, names] of [
+    ['pptSource', inbox.files.filter(x=>x.toLowerCase().endsWith('.xlsx'))],
+    ['pptTemplate', [...templates.names,...inbox.files].filter(x=>x.toLowerCase().endsWith('.pptx'))]
+  ]){
+    const select=document.getElementById(id),previous=select.value;
+    select.innerHTML='<option value="">请选择文件</option>' + names.map(x=>
+      '<option value="'+pptEscape(x)+'">'+pptEscape(x)+'</option>').join('');
+    const choice=preferred.find(x=>names.includes(x)) || (names.includes(previous)?previous:'');
+    if(choice)select.value=choice;
+  }
+}
+document.getElementById('pptUpload').addEventListener('change',async function(){
+  const fd=new FormData(); for(const file of this.files)fd.append('files',file);
+  const msg=document.getElementById('pptMsg'); msg.textContent='上传中…';
+  try{
+    const d=await (await fetch('/api/upload',{method:'POST',body:fd})).json();
+    msg.textContent=d.message || d.error || '上传失败';
+    if(d.ok)await refreshPptChoices(d.saved||[]);
+  }catch(e){msg.textContent='上传失败：'+e;}
+  this.value='';
+});
+document.getElementById('pptRun').addEventListener('click',async function(){
+  const source_name=document.getElementById('pptSource').value;
+  const template_name=document.getElementById('pptTemplate').value;
+  const msg=document.getElementById('pptMsg');
+  if(!source_name || !template_name){msg.textContent='请先选择数据源和 PPT 模板';return;}
+  this.disabled=true;msg.textContent='正在更新表格…';
+  try{
+    const d=await (await fetch('/api/run/monthly_report_ppt_tables',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({source_name,template_name})})).json();
+    renderResult(document.getElementById('result'),d);
+    msg.textContent=d.ok?'更新完成，可从下方结果下载。':(d.message||'执行失败');
+  }catch(e){msg.textContent='执行失败：'+e;}
+  this.disabled=false;
+});
+refreshPptChoices();
+</script>
+{% else %}
+<button class="btn" onclick="runTask('{{ task.key }}', this)">执行此任务</button>
+{% endif %}
+
+<div id="result"></div>
+
+<div class="grp" style="margin-top:34px;">
+  <div class="grp-t">最近运行记录</div>
+  {% if histories %}
+  <table>
+    <thead>
+      <tr><th style="width:22%">时间</th><th style="width:12%">状态</th><th style="width:10%">耗时</th><th>结果</th></tr>
+    </thead>
+    <tbody>
+      {% for h in histories %}
+      <tr>
+        <td class="mono">{{ h.started_at }}</td>
+        <td>
+          {% if h.ok %}<span class="tag g">成功</span>{% else %}<span class="tag r">失败</span>{% endif %}
+        </td>
+        <td>{{ h.elapsed }}s</td>
+        <td>{{ h.message }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">还没有运行记录</div>
+  {% endif %}
+</div>
+{% endblock %}

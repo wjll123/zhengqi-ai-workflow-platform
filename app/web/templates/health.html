@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block nav_health %}on{% endblock %}
+{% block title %}健康检查 · 政企存量平台{% endblock %}
+
+{% block content %}
+<h1 class="page">健康检查</h1>
+<div class="sub">
+  一键自检平台运行状态：环境、依赖、目录、磁盘、任务、运行记录、源数据、日志。
+</div>
+
+<div id="top" style="margin:18px 0;">
+  <button class="btn" id="btnCheck">重新检查</button>
+  <span id="checkedAt" style="margin-left:12px;font-size:12.5px;color:var(--ink3);"></span>
+</div>
+
+<div id="summary"></div>
+<div id="checks" class="cards" style="margin-top:16px;"></div>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+const LEVEL_ICON = {ok:'✓', warn:'⚠', error:'✗', info:'ℹ'};
+const LEVEL_TEXT = {ok:'正常', warn:'留意', error:'异常', info:'提示'};
+
+async function loadHealth(){
+  const box = document.getElementById('checks');
+  const sum = document.getElementById('summary');
+  const at  = document.getElementById('checkedAt');
+  box.innerHTML = '<div class="empty">检查中…</div>';
+  sum.innerHTML = '';
+
+  try{
+    const d = await (await fetch('/health')).json();
+
+    // ---- 总体结论
+    const cls = d.level === 'ok' ? 'ok' : (d.level === 'warn' ? 'warnbox' : 'fail');
+    sum.innerHTML = '<div class="result ' + (d.level === 'ok' ? 'ok' : (d.level === 'warn' ? 'warnbox' : 'fail')) +
+      '"><div class="rh">' + LEVEL_ICON[d.level] + ' ' + esc(d.summary) + '</div></div>';
+    at.textContent = '检查时间：' + esc(d.checked_at);
+
+    // ---- 逐项
+    box.innerHTML = d.checks.map(function(c){
+      const icon = LEVEL_ICON[c.level] || 'ℹ';
+      const lbl  = LEVEL_TEXT[c.level] || '';
+      const color = c.level === 'ok' ? 'var(--green)'
+                  : c.level === 'warn' ? 'var(--amber)'
+                  : c.level === 'error' ? 'var(--red)' : 'var(--ink3)';
+      return '<div class="card" style="cursor:default;">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+          '<span style="color:' + color + ';font-weight:700;font-size:15px;">' + icon + '</span>' +
+          '<h3 style="margin:0;">' + esc(c.name) + '</h3>' +
+          '<span style="margin-left:auto;font-size:11.5px;color:' + color + ';font-weight:600;">' + lbl + '</span>' +
+        '</div>' +
+        '<p style="margin:0;font-size:13px;color:var(--ink2);line-height:1.65;word-break:break-all;">' + esc(c.detail) + '</p>' +
+        (c.advice ? '<div class="warn" style="margin-top:10px;">建议：' + esc(c.advice) + '</div>' : '') +
+        '</div>';
+    }).join('');
+
+    // ---- 关键事实
+    const f = d.facts || {};
+    box.insertAdjacentHTML('beforeend',
+      '<div class="card" style="cursor:default;grid-column:1/-1;">' +
+        '<h3>关键信息</h3>' +
+        '<div class="kv" style="margin-top:10px;">' +
+          '<div class="k">Python</div><div class="v">' + esc(f.python) + '</div>' +
+          '<div class="k">已注册任务</div><div class="v">' + esc(f.tasks) + ' 个</div>' +
+          '<div class="k">收件目录文件</div><div class="v">' + esc(f.inbox_files) + ' 个</div>' +
+          '<div class="k">源数据目录</div><div class="v" style="font-size:12px;">' + esc(f.inbox_dir) + '</div>' +
+          '<div class="k">成品目录</div><div class="v" style="font-size:12px;">' + esc(f.outputs_dir) + '</div>' +
+        '</div>' +
+      '</div>');
+  }catch(e){
+    box.innerHTML = '<div class="empty">检查失败：' + esc(e) + '</div>';
+  }
+}
+
+document.getElementById('btnCheck').addEventListener('click', loadHealth);
+loadHealth();
+</script>
+{% endblock %}

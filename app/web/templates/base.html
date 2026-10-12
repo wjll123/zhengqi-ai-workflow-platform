@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}政企存量平台{% endblock %}</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#fff; --ink:#1b1f27; --ink2:#4a5262; --ink3:#8a92a3;
+    --line:#e4e7ee; --line2:#eef0f5;
+    --blue:#2f6bff; --blue-bg:#eef3ff;
+    --green:#12a150; --green-bg:#e9f8ef;
+    --amber:#d98200; --amber-bg:#fff6e5;
+    --red:#e02f4f; --red-bg:#ffedf0;
+    --purple:#7048d6; --purple-bg:#f2edff;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:var(--bg);color:var(--ink);line-height:1.65;
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none;}
+
+  /* 顶栏 */
+  .topbar{
+    background:var(--panel);border-bottom:1px solid var(--line);
+    padding:0 28px;height:56px;display:flex;align-items:center;gap:26px;
+    position:sticky;top:0;z-index:20;
+  }
+  .topbar .brand{font-size:16px;font-weight:700;letter-spacing:-.2px;}
+  .topbar .brand span{color:var(--blue);}
+  .topbar nav{display:flex;gap:20px;font-size:14px;color:var(--ink2);}
+  .topbar nav a{padding:4px 0;border-bottom:2px solid transparent;}
+  .topbar nav a:hover{color:var(--blue);}
+  .topbar nav a.on{color:var(--blue);border-bottom-color:var(--blue);font-weight:600;}
+  .topbar .right{margin-left:auto;font-size:12.5px;color:var(--ink3);display:flex;gap:14px;align-items:center;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px;}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:30px 28px 70px;}
+
+  h1.page{font-size:24px;font-weight:700;letter-spacing:-.3px;margin-bottom:6px;}
+  .sub{color:var(--ink3);font-size:14px;margin-bottom:26px;}
+
+  /* 模块分组 */
+  .grp{margin-bottom:30px;}
+  .grp-t{
+    font-size:12.5px;font-weight:700;color:var(--ink3);letter-spacing:1.2px;
+    text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;
+  }
+  .grp-t::after{content:"";flex:1;height:1px;background:var(--line);}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px;transition:.15s;cursor:pointer;display:flex;flex-direction:column;
+  }
+  .card:hover{border-color:#c9daff;box-shadow:0 3px 14px rgba(47,107,255,.09);transform:translateY(-1px);}
+  .card h3{font-size:15.5px;font-weight:600;margin-bottom:6px;}
+  .card p{font-size:13px;color:var(--ink3);flex:1;}
+  .card .foot{margin-top:14px;display:flex;align-items:center;gap:8px;}
+
+  .tag{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:5px;background:var(--blue-bg);color:var(--blue);}
+  .tag.g{background:var(--green-bg);color:var(--green);}
+  .tag.a{background:var(--amber-bg);color:var(--amber);}
+  .tag.r{background:var(--red-bg);color:var(--red);}
+  .tag.p{background:var(--purple-bg);color:var(--purple);}
+  .tag.gray{background:#f2f3f6;color:var(--ink3);}
+
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:6px;
+    padding:8px 18px;border-radius:8px;font-size:13.5px;font-weight:600;
+    background:var(--blue);color:#fff;border:none;cursor:pointer;transition:.15s;
+    font-family:inherit;
+  }
+  .btn:hover{background:#1f5aeb;}
+  .btn:disabled{background:#b9c7e6;cursor:not-allowed;}
+  .btn.ghost{background:var(--panel);color:var(--ink2);border:1px solid var(--line);}
+  .btn.ghost:hover{background:#fafbfc;color:var(--ink);}
+  .btn.sm{padding:5px 12px;font-size:12.5px;}
+  .btn.full{width:100%;}
+
+  /* 结果区 */
+  .result{
+    margin-top:18px;border-radius:var(--radius);border:1px solid var(--line);
+    background:var(--panel);overflow:hidden;
+  }
+  .result .rh{padding:13px 18px;font-weight:600;font-size:14px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--line2);}
+  .result.ok .rh{background:var(--green-bg);color:var(--green);}
+  .result.fail .rh{background:var(--red-bg);color:var(--red);}
+  .result.warnbox .rh{background:var(--amber-bg);color:var(--amber);}
+  .result .rb{padding:16px 18px;font-size:13.5px;color:var(--ink2);}
+  .result .rb pre{
+    background:#fafbfc;border:1px solid var(--line2);border-radius:8px;padding:12px 14px;
+    font-size:12.5px;overflow-x:auto;font-family:"SF Mono",Menlo,Consolas,monospace;
+    line-height:1.7;color:var(--ink2);
+  }
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 18px;font-size:13px;}
+  .kv .k{color:var(--ink3);}
+  .kv .v{color:var(--ink);word-break:break-all;}
+
+  .warn{background:var(--amber-bg);border:1px solid #f5ddb0;color:var(--amber);
+    border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  th{background:#fafbfc;text-align:left;font-weight:700;font-size:12.5px;color:var(--ink3);
+    letter-spacing:.4px;padding:11px 15px;border-bottom:1px solid var(--line);}
+  td{padding:11px 15px;border-bottom:1px solid var(--line2);color:var(--ink2);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr:hover td{background:#fafbfc;}
+
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.4);
+    border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+
+  .empty{text-align:center;color:var(--ink3);font-size:13.5px;padding:40px 0;}
+  .mono{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;}
+
+  /* ---- 产出文件行 ---- */
+  .outrow{
+    display:flex;align-items:center;gap:12px;padding:8px 12px;margin-top:6px;
+    background:#fafbfc;border:1px solid var(--line2);border-radius:8px;
+  }
+  .outrow .fname{flex:1;font-size:13.5px;color:var(--ink2);word-break:break-all;}
+  .outrow .fsz{color:var(--ink3);font-size:12px;margin-left:6px;}
+  .outrow .file-pick{width:17px;height:17px;accent-color:var(--blue);flex:none;cursor:pointer;}
+  .cnt{font-weight:400;font-size:12px;color:var(--ink3);margin-left:6px;}
+
+  /* ---- 数据预览 ---- */
+  .pv{margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel);}
+  .pv-h{
+    padding:10px 14px;background:#f7f8fa;border-bottom:1px solid var(--line2);
+    font-size:13px;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:12px;
+  }
+  .pv-meta{margin-left:auto;font-weight:400;font-size:12.5px;color:var(--ink3);}
+  .pv-sel{
+    font-size:12.5px;padding:3px 8px;border:1px solid var(--line);border-radius:6px;
+    background:#fff;color:var(--ink2);font-family:inherit;cursor:pointer;
+  }
+  .pv-text{
+    margin:0;padding:14px 16px;font-size:12.5px;line-height:1.9;color:var(--ink2);
+    font-family:"SF Mono",Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all;
+    max-height:420px;overflow:auto;background:#fafbfc;
+  }
+  .tblwrap{max-height:460px;overflow:auto;}
+  table.dt{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.dt th{
+    position:sticky;top:0;z-index:2;background:#f2f4f8;color:var(--ink2);
+    font-weight:700;text-align:left;padding:8px 12px;white-space:nowrap;
+    border-bottom:1px solid var(--line);border-right:1px solid var(--line2);
+  }
+  table.dt thead tr:nth-child(2) th{top:34px;}
+  table.dt thead tr:nth-child(3) th{top:68px;}
+  table.dt td{
+    padding:7px 12px;border-bottom:1px solid var(--line2);border-right:1px solid var(--line2);
+    color:var(--ink2);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis;
+  }
+  table.dt tr:nth-child(even) td{background:#fcfcfd;}
+  table.dt tr:hover td{background:var(--blue-bg);}
+  table.dt th:last-child,table.dt td:last-child{border-right:none;}
+
+  /* ---- 数据源类别标记 ---- */
+  .src{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;letter-spacing:.3px;white-space:nowrap;}
+  .src-auto{background:var(--green-bg);color:var(--green);}
+  .src-semi{background:var(--amber-bg);color:var(--amber);}
+  .src-manual{background:#f2f3f6;color:var(--ink3);}
+  .hint{font-size:11.5px;color:var(--ink3);}
+
+  /* ---- 账期条 ---- */
+  .batchbar{
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    margin:14px 0 4px;padding:12px 16px;
+    background:linear-gradient(90deg,#f3f7ff,#f8fbff);
+    border:1px solid #dde8f8;border-radius:10px;
+  }
+  .bb-l{display:flex;align-items:center;gap:9px;}
+  .bb-lb{font-size:13px;font-weight:600;color:var(--ink2);}
+  .bb-in{
+    width:110px;padding:5px 10px;font-size:13px;
+    border:1px solid var(--line);border-radius:6px;outline:none;
+    font-family:"SF Mono",Menlo,Consolas,monospace;
+  }
+  .bb-in:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-bg);}
+  .bb-msg{font-size:12.5px;}
+  .bb-r{font-size:12.5px;color:var(--ink3);margin-left:auto;}
+
+  /* ---- 本批次待源面板 ---- */
+  .needpanel{
+    margin:14px 0 4px;padding:0;
+    border:1px solid #f0d9dc;border-radius:10px;overflow:hidden;
+    background:#fffafa;
+  }
+  .np-h{
+    display:flex;align-items:center;gap:12px;
+    padding:11px 16px;background:#fdf1f2;border-bottom:1px solid #f7e2e5;
+  }
+  .np-t{font-size:13.5px;font-weight:700;color:var(--ink);}
+  .np-c{font-size:12.5px;}
+  .np-b{padding:13px 16px;}
+  .np-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .np-chip{
+    font-size:12.5px;padding:4px 11px;border-radius:6px;
+    background:var(--red-bg);color:var(--red);border:1px solid #f5cfd3;
+  }
+  .np-tip{margin-top:11px;font-size:12.5px;color:var(--ink3);line-height:1.65;}
+
+  /* ---- 任务卡：源数据状态徽标 ---- */
+  .srcdot{
+    font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;
+    cursor:pointer;letter-spacing:.3px;white-space:nowrap;user-select:none;
+    border:1px solid transparent;
+  }
+  .srcdot:hover{opacity:.8;}
+  .srcdot-ok{background:var(--green-bg);color:var(--green);border-color:#cbe8d8;}
+  .srcdot-miss{background:var(--red-bg);color:var(--red);border-color:#f5cfd3;}
+
+  /* ---- 任务卡：源数据明细 ---- */
+  .srcblock{
+    margin:10px 0 2px;padding:10px 12px;
+    background:#fafbfc;border:1px solid var(--line2);border-radius:8px;
+  }
+  .sic{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0;}
+  .siicon{font-weight:700;flex:0 0 14px;}
+  .siname{color:var(--ink2);flex:1;min-width:0;}
+  .sifile{
+    color:var(--ink3);font-size:11.5px;
+    font-family:"SF Mono",Menlo,Consolas,monospace;
+    max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+
+  /* ---- 任务卡：产出物名称 ---- */
+  .outdesc{
+    display:flex;gap:8px;align-items:flex-start;
+    margin:11px 0 2px;padding:8px 10px;
+    background:#f7f9fc;border-left:3px solid var(--blue);
+    border-radius:0 6px 6px 0;
+  }
+  .outdesc .od-lb{
+    flex:0 0 auto;font-size:11px;font-weight:700;color:var(--blue);
+    background:var(--blue-bg);padding:1px 7px;border-radius:4px;letter-spacing:.3px;
+    margin-top:1px;
+  }
+  .outdesc .od-v{
+    font-size:12.5px;color:var(--ink2);line-height:1.6;word-break:break-all;
+  }
+  .outdesc .od-v b{
+    color:var(--ink);font-weight:600;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;
+  }
+
+  /* ---- 顶部图例 ---- */
+  .legend{
+    display:flex;flex-wrap:wrap;gap:24px;align-items:center;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 20px;margin-bottom:26px;
+  }
+  .lg-item{display:flex;align-items:center;gap:9px;}
+  .lg-text{font-size:12.5px;color:var(--ink3);}
+
+  /* ---- 取数指引卡 ---- */
+  .guide{
+    margin-top:11px;border:1px solid #f5ddb0;background:#fffdfa;
+    border-radius:9px;padding:12px 14px;font-size:12.5px;line-height:1.95;color:var(--ink2);
+  }
+  .guide .gh{font-weight:700;color:var(--amber);margin-bottom:8px;}
+  .guide pre{
+    margin:0;white-space:pre-wrap;word-break:break-all;
+    font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;line-height:1.85;color:var(--ink2);
+  }
+  .guide .go{margin-top:10px;padding-top:10px;border-top:1px dashed #f5ddb0;font-size:12.5px;}
+
+  /* ---- 预览分页 ---- */
+  .pager{
+    display:flex;align-items:center;gap:12px;justify-content:center;
+    padding:10px 14px;border-top:1px solid var(--line2);background:#fafbfc;
+    font-size:12.5px;color:var(--ink3);
+  }
+
+  /* ---- 智能弹窗 ---- */
+  .mdl-mask{
+    position:absolute;inset:0;background:rgba(27,31,39,.42);
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:60px 20px;z-index:100;overflow:auto;
+  }
+  .mdl{
+    background:var(--panel);border-radius:14px;width:100%;max-width:680px;
+    border:1px solid var(--line);overflow:hidden;
+  }
+  .mdl-top{
+    display:flex;align-items:flex-start;gap:14px;
+    padding:18px 22px;border-bottom:1px solid var(--line2);background:#fafbfc;
+  }
+  .mdl-title{font-size:16px;font-weight:700;color:var(--ink);}
+  .mdl-sub{font-size:13px;color:var(--ink3);margin-top:4px;}
+  .mdl-x{
+    margin-left:auto;background:none;border:none;cursor:pointer;
+    font-size:15px;color:var(--ink3);padding:2px 6px;font-family:inherit;
+  }
+  .mdl-x:hover{color:var(--ink);}
+  .mdl-body{padding:20px 22px;max-height:60vh;overflow:auto;}
+  .mdl-foot{
+    display:flex;gap:10px;justify-content:flex-end;
+    padding:14px 22px;border-top:1px solid var(--line2);background:#fafbfc;
+  }
+  .mdl-msg{
+    background:var(--red-bg);border:1px solid #f5c9c9;color:var(--red);
+    border-radius:8px;padding:11px 14px;font-size:13px;margin-bottom:16px;
+  }
+  .mdl-sec{margin-bottom:18px;}
+  .mdl-h{font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:8px;}
+  .mdl-tip{font-size:12.5px;color:var(--ink3);line-height:1.8;}
+  .mdl-code{
+    margin:0;background:#fafbfc;border:1px solid var(--line2);border-radius:8px;
+    padding:11px 13px;font-family:"SF Mono",Menlo,Consolas,monospace;
+    font-size:12px;line-height:1.8;color:var(--ink2);white-space:pre-wrap;word-break:break-all;
+    max-height:260px;overflow:auto;
+  }
+  .mdl-files{display:flex;flex-direction:column;gap:7px;}
+  .mdl-dl{
+    display:inline-block;font-size:13px;color:var(--blue);text-decoration:underline;
+    padding:7px 11px;background:var(--blue-bg);border-radius:7px;align-self:flex-start;
+  }
+  .mdl-drop{
+    border:1.5px dashed var(--line);border-radius:10px;padding:22px 16px;
+    text-align:center;color:var(--ink3);font-size:13px;background:#fafbfc;transition:.15s;
+  }
+  .mdl-drop.on{border-color:var(--blue);background:var(--blue-bg);}
+  .mdl-pick{color:var(--blue);cursor:pointer;text-decoration:underline;}
+  .mdl-dropmsg{margin-top:9px;font-size:12.5px;line-height:1.8;}
+  .mdl-det{margin-top:14px;border-top:1px solid var(--line2);padding-top:12px;}
+  .mdl-det summary{
+    cursor:pointer;font-size:13px;color:var(--ink2);font-weight:500;
+  }
+  .mdl-det .mdl-code{margin-top:10px;}
+  @media(max-width:650px){
+    .topbar{height:auto;padding:10px 16px;gap:7px 12px;flex-wrap:wrap;position:relative;}
+    .topbar .brand{font-size:15px;}
+    .topbar nav{order:3;width:100%;gap:16px;overflow-x:auto;white-space:nowrap;font-size:12.5px;}
+    .topbar .right{font-size:11px;}
+    .wrap{padding:22px 16px 54px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">政企<span>存量</span>平台</div>
+  <nav>
+    <a href="/" class="{% block nav_home %}{% endblock %}">任务中心</a>
+    <a href="/dispatch" class="{% block nav_dispatch %}{% endblock %}">派单工作台</a>
+    <a href="/runs" class="{% block nav_runs %}{% endblock %}">运行记录</a>
+    <a href="/health/page" class="{% block nav_health %}{% endblock %}">健康检查</a>
+  </nav>
+  <div class="right">
+    <span><span class="dot"></span>服务运行中</span>
+  </div>
+</div>
+
+<div class="wrap">
+{% block content %}{% endblock %}
+</div>
+
+<script>
+async function runTask(key, btn){
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spin"></span> 执行中…';
+
+  const box = document.getElementById('result') || document.getElementById('taskresult');
+  if(box) box.innerHTML = '';
+
+  try{
+    const r = await fetch('/api/run/' + key, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({})
+    });
+    const d = await r.json();
+    if(box) renderResult(box, d);
+
+    // 失败时 → 智能弹出「怎么办」窗口
+    if(!d.ok){
+      await showActionModal(key, d);
+    }
+  }catch(e){
+    if(box) box.innerHTML = '<div class="result fail"><div class="rh">请求失败</div>' +
+      '<div class="rb"><pre>' + escapeHtml(String(e)) + '</pre></div></div>';
+  }finally{
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+}
+
+/* ============ 智能弹窗：根据失败原因给对应入口 ============ */
+async function showActionModal(key, result){
+  let guide = {};
+  try{ guide = await (await fetch('/api/guide/' + encodeURIComponent(key))).json(); }catch(e){}
+
+  const st = guide.source_type || 'auto';
+  const msg = result.message || '';
+
+  // 判断失败场景
+  let scene = 'unknown';
+  if(msg.indexOf('缺少 ') >= 0 && msg.indexOf('项源数据') >= 0){
+    scene = 'need_source';        // 执行前源预检未通过
+  }else if(msg.indexOf('源数据校验失败') >= 0){
+    scene = 'invalid_source';
+  }else if(msg.indexOf('空白模板') >= 0 || msg.indexOf('未找到填好的') >= 0 || msg.indexOf('请先填写') >= 0){
+    scene = 'need_fill';
+  }else if(msg.indexOf('未找到') >= 0 || msg.indexOf('缺少源文件') >= 0 || msg.indexOf('请从文件列表中选择工作簿') >= 0){
+    scene = 'need_upload';
+  }else if(st === 'semi'){
+    scene = 'need_sql';
+  }else if(st === 'manual'){
+    scene = 'need_fill';
+  }
+
+  openModal(renderActionModal(scene, key, guide, msg, result));
+}
+
+function renderActionModal(scene, key, guide, msg, result){
+  const T = {
+    need_source:{ icon:'📥', title:'需要先提供源数据', sub:'本任务需要以下数据源，补齐后即可执行' },
+    invalid_source:{ icon:'⚠️', title:'源数据校验失败', sub:'请按错误提示修正工作表或数据后重新上传' },
+    need_fill:  { icon:'📝', title:'需要先提供数据', sub:'下载模板 → 填写 → 上传，平台自动算比率' },
+    need_upload:{ icon:'📥', title:'需要先上传数据源', sub:'把源文件拖进来，平台即可加工' },
+    need_sql:   { icon:'🗄️', title:'这项需要先取数', sub:'按指引跑取数，结果上传后即可加工' },
+    unknown:    { icon:'⚠️', title:'执行未通过', sub:'请参考下方指引处理' },
+  }[scene] || { icon:'⚠️', title:'执行未通过', sub:'' };
+
+  let body = '';
+  body += '<div class="mdl-msg">' + escapeHtml(msg.split('\n')[0] || '') + '</div>';
+
+  // —— 按场景给操作区 ——
+  if(scene === 'need_source'){
+    // 列出缺少的源（从后端返回的 metrics 里取）
+    const miss = ((result && result.metrics) || {})['缺失源'] || [];
+    const ready = ((result && result.metrics) || {})['已就绪源'] || [];
+
+    if(miss.length){
+      body += '<div class="mdl-sec"><div class="mdl-h">缺少以下 ' + miss.length + ' 项源数据</div>' +
+        '<div class="mdl-srcs">' +
+        miss.map(function(x){
+          return '<div class="sic"><span class="siicon" style="color:var(--red);">✗</span>' +
+                 '<span class="siname">' + escapeHtml(x) + '</span></div>';
+        }).join('') +
+        '</div></div>';
+    }
+    if(ready.length){
+      body += '<div class="mdl-sec"><div class="mdl-h">已就绪（无需重传）</div>' +
+        '<div class="mdl-srcs">' +
+        ready.map(function(x){
+          return '<div class="sic"><span class="siicon" style="color:var(--green);">✓</span>' +
+                 '<span class="siname">' + escapeHtml(x) + '</span></div>';
+        }).join('') +
+        '</div></div>';
+    }
+
+    body += '<div class="mdl-sec"><div class="mdl-h">上传补齐</div>' +
+      dropzoneHtml('mdlDrop', 'mdlFile') + '</div>';
+
+    if(guide.source_note){
+      body += '<div class="mdl-sec"><div class="mdl-h">怎么取这些数据</div>' +
+        '<pre class="mdl-code">' + escapeHtml(guide.source_note) + '</pre></div>';
+    }
+  }
+
+  if(scene === 'need_fill'){
+    body += '<div class="mdl-sec"><div class="mdl-h">第 1 步 · 下载模板</div>' +
+      '<div id="mdlTmpl" class="mdl-files"><span style="color:var(--ink3);">读取中…</span></div></div>' +
+      '<div class="mdl-sec"><div class="mdl-h">第 2 步 · 填好数据后上传</div>' +
+      dropzoneHtml('mdlDrop', 'mdlFile') + '</div>' +
+      '<div class="mdl-sec"><div class="mdl-h">第 3 步 · 回到任务点「执行」</div>' +
+      '<div class="mdl-tip">比率（回单率 / 转化率等）平台会自动计算，不用手填。</div></div>';
+  }
+
+  if(scene === 'need_upload' || scene === 'need_sql' || scene === 'invalid_source'){
+    body += '<div class="mdl-sec"><div class="mdl-h">上传数据源</div>' +
+      dropzoneHtml('mdlDrop', 'mdlFile') + '</div>';
+    if(key === 'monthly_4plus2'){
+      body += '<div class="mdl-tip">上传后请到<a href="/task/monthly_4plus2" style="color:var(--blue);text-decoration:underline;">月报文件选择页</a>核对四份源数据和两份计算模板，再生成成果。指标跟踪历史底稿由平台续写。</div>';
+    }
+    if(guide.source_note){
+      body += '<div class="mdl-sec"><div class="mdl-h">取数指引</div>' +
+        '<pre class="mdl-code">' + escapeHtml(guide.source_note) + '</pre></div>';
+    }
+  }
+
+  // 保留原始指引（折叠）
+  if(guide.source_note){
+    body += '<details class="mdl-det"><summary>查看完整指引</summary>' +
+      '<pre class="mdl-code">' + escapeHtml(guide.source_note) + '</pre></details>';
+  }
+
+  return {title: T.icon + ' ' + T.title, sub: T.sub, body: body, key: key, scene: scene};
+}
+
+function dropzoneHtml(dzId, inputId){
+  return '<div id="' + dzId + '" class="mdl-drop">' +
+    '把文件拖到这里，或 <label class="mdl-pick">点这里选择文件' +
+    '<input type="file" id="' + inputId + '" multiple style="display:none;" ' +
+    'accept=".xlsx,.xls,.xlsm,.csv,.txt,.pptx,.docx"></label>' +
+    '<div id="' + dzId + '-msg" class="mdl-dropmsg"></div></div>';
+}
+
+/* ============ 弹窗基础 ============ */
+function openModal(cfg){
+  closeModal();
+  const wrap = document.createElement('div');
+  wrap.className = 'mdl-mask';
+  wrap.id = 'mdlMask';
+  wrap.innerHTML =
+    '<div class="mdl">' +
+      '<div class="mdl-top">' +
+        '<div><div class="mdl-title">' + escapeHtml(cfg.title) + '</div>' +
+        (cfg.sub ? '<div class="mdl-sub">' + escapeHtml(cfg.sub) + '</div>' : '') + '</div>' +
+        '<button class="mdl-x" data-close="1">✕</button>' +
+      '</div>' +
+      '<div class="mdl-body">' + cfg.body + '</div>' +
+      '<div class="mdl-foot">' +
+        '<button class="btn ghost sm" data-close="1">关闭</button>' +
+        '<button class="btn sm" data-close="1" data-retry="' + escapeAttr(cfg.key) + '">我已处理，重试</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(wrap);
+
+  // 加载模板列表（人工供数场景）
+  const tmplBox = document.getElementById('mdlTmpl');
+  if(tmplBox){
+    fetch('/api/templates').then(r=>r.json()).then(d=>{
+      const want = cfg.key.indexOf('weekly') >= 0 ? '每周活动汇总'
+                 : cfg.key.indexOf('sub35') >= 0 ? '3.5潜客转化' : '';
+      const found = (d.files||[]).filter(f => !want || f.name.indexOf(want) >= 0);
+      tmplBox.innerHTML = found.length
+        ? found.map(f => '<a class="mdl-dl" href="/api/download/' + encodeURIComponent(f.name) + '">' +
+            '📥 ' + escapeHtml(f.name) + '</a>').join('')
+        : '<span style="color:var(--ink3);">暂无模板，请先执行「生成模板」任务</span>';
+    }).catch(()=>{ tmplBox.innerHTML = '<span style="color:var(--ink3);">模板读取失败</span>'; });
+  }
+
+  // 绑定拖拽上传
+  const dz = document.getElementById('mdlDrop');
+  const fi = document.getElementById('mdlFile');
+  const dmsg = document.getElementById('mdlDrop-msg');
+  if(dz && fi){
+    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation();
+      dz.classList.add('on');
+    }));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation();
+      dz.classList.remove('on');
+    }));
+    dz.addEventListener('drop', e => {
+      if(e.dataTransfer && e.dataTransfer.files) doModalUpload(e.dataTransfer.files, dmsg);
+    });
+    fi.addEventListener('change', function(){ doModalUpload(this.files, dmsg); this.value = ''; });
+  }
+}
+
+async function doModalUpload(fileList, msgEl){
+  if(!fileList || !fileList.length) return;
+  const fd = new FormData();
+  for(const f of fileList) fd.append('files', f);
+  msgEl.innerHTML = '<span style="color:var(--ink3);">上传中…</span>';
+  try{
+    const d = await (await fetch('/api/upload', {method:'POST', body:fd})).json();
+    msgEl.innerHTML = d.ok
+      ? '<span style="color:var(--green);">✓ ' + escapeHtml(d.message) + '</span>' +
+        (d.saved||[]).map(x=>'<br>　· '+escapeHtml(x)).join('') +
+        '<br><span style="color:var(--ink3);font-size:12px;">文件已上传，请点下方「我已处理，重试」校验并执行</span>'
+      : '<span style="color:var(--red);">✕ ' + escapeHtml(d.error||'上传失败') + '</span>';
+    if(typeof loadDirs === 'function') loadDirs();
+    if(d.ok){
+      // 上传成功后刷新源状态（任务卡徽标 + 待源面板）
+      if(typeof loadSourceStatus === 'function') loadSourceStatus();
+      if(typeof loadNeedPanel === 'function') loadNeedPanel();
+    }
+  }catch(e){
+    msgEl.innerHTML = '<span style="color:var(--red);">✕ 上传失败</span>';
+  }
+}
+
+function closeModal(){
+  const m = document.getElementById('mdlMask');
+  if(m) m.remove();
+}
+
+document.addEventListener('click', function(ev){
+  // 关闭
+  if(ev.target.closest('[data-close]')){
+    closeModal();
+    // 重试
+    const rb = ev.target.closest('[data-retry]');
+    if(rb){
+      const key = rb.getAttribute('data-retry');
+      // 刷新源数据状态（用户刚上传过）
+      if(typeof loadSourceStatus === 'function') loadSourceStatus();
+      const card = document.querySelector('button[onclick*="' + key + '"]');
+      if(card) runTask(key, card);
+    }
+    return;
+  }
+  // 点遮罩关闭
+  if(ev.target.id === 'mdlMask') closeModal();
+});
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
+
+function renderResult(box, d){
+  const cls = d.ok ? 'ok' : 'fail';
+  const title = d.ok ? '✓ 执行成功' : '✕ 执行失败';
+  let html = '<div class="result ' + cls + '"><div class="rh">' + title +
+             '<span style="margin-left:auto;font-weight:400;font-size:12.5px;opacity:.75;">' +
+             (d.elapsed||0) + 's · ' + (d.run_id||'') + '</span></div><div class="rb">';
+  html += '<div style="margin-bottom:12px;">' + (d.message||'') + '</div>';
+
+  if(d.metrics && Object.keys(d.metrics).length){
+    html += '<div class="kv">';
+    for(const [k,v] of Object.entries(d.metrics)){
+      const val = (typeof v === 'object') ? JSON.stringify(v, null, 0) : v;
+      html += '<div class="k">' + k + '</div><div class="v">' + val + '</div>';
+    }
+    html += '</div>';
+  }
+
+  // ---- 产出文件：下载始终可用，表格文件另提供预览 ----
+  if(d.outputs && d.outputs.length){
+    html += '<div style="margin-top:16px;"><b>产出文件</b></div>';
+    d.outputs.forEach(function(p){
+      const name = p.split('/').pop();
+      const uid = 'pv-' + (++pvSeq);
+      const isTable = /\.(xlsx|xls|xlsm|csv)$/i.test(name);
+      // 用 data 属性传文件名，避免内联引号与中文转义问题
+      html += '<div class="outrow">' +
+                '<span class="fname">📄 ' + escapeHtml(name) + '</span>' +
+                '<a class="btn sm" href="/api/download/' + encodeURIComponent(name) + '">下载文件</a>' +
+                (isTable ? '<button class="btn ghost sm" data-pv="' + escapeAttr(name) +
+                  '" data-target="' + uid + '">查看数据</button>' : '') +
+              '</div>' +
+              (isTable ? '<div id="' + uid + '"></div>' : '');
+    });
+  }
+
+  if(d.warnings && d.warnings.length){
+    html += '<div class="warn">⚠️ ' + d.warnings.join('<br>⚠️ ') + '</div>';
+  }
+  html += '</div></div>';
+  box.innerHTML = html;
+}
+
+// ---- 数据预览（事件委托，避免内联 onclick 的转义问题）----
+let pvSeq = 0;
+
+document.addEventListener('click', function(ev){
+  const btn = ev.target.closest('button[data-pv]');
+  if(!btn) return;
+  togglePreview(btn);
+});
+
+async function togglePreview(btn){
+  const name = btn.getAttribute('data-pv');
+  const scope = btn.getAttribute('data-scope') || 'outputs';
+  const holder = document.getElementById(btn.getAttribute('data-target'));
+  if(!holder) return;
+
+  // 再点一次收起
+  if(holder.dataset.open === '1'){
+    holder.innerHTML = '';
+    holder.dataset.open = '0';
+    btn.textContent = '查看数据';
+    return;
+  }
+
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = '加载中…';
+
+  try{
+    const r = await fetch('/api/preview/' + encodeURIComponent(name) + '?scope=' + encodeURIComponent(scope));
+    if(!r.ok){
+      throw new Error('HTTP ' + r.status);
+    }
+    const d = await r.json();
+    holder.dataset.open = '1';
+    btn.textContent = '收起';
+    renderPreview(holder, d, name, btn.getAttribute('data-target'));
+  }catch(e){
+    holder.innerHTML = '<div class="warn">⚠️ 加载失败：' + escapeHtml(String(e.message||e)) + '</div>';
+    btn.textContent = orig;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function renderPreview(holder, d, name, idx){
+  if(!d.ok){
+    holder.innerHTML = '<div class="warn">⚠️ ' + (d.error||'无法预览') + '</div>';
+    return;
+  }
+
+  // 文本文件
+  if(d.type === 'text'){
+    holder.innerHTML = '<div class="pv"><div class="pv-h">' + d.file +
+      '<span class="pv-meta">' + (d.size/1024).toFixed(1) + ' KB</span></div>' +
+      '<pre class="pv-text">' + escapeHtml(d.content) + '</pre></div>';
+    return;
+  }
+
+  // 表格文件
+  const fromRow = (d.offset || 0) + 1;
+  const toRow = (d.offset || 0) + (d.shown_rows || 0);
+  let bar = '<div class="pv-h">' + escapeHtml(d.file) +
+    '<span class="pv-meta">共 ' + d.total_rows + ' 行 × ' + d.total_cols + ' 列' +
+    (d.total_rows > (d.limit || 300) ? '　·　显示第 ' + fromRow + '–' + toRow + ' 行' : '') +
+    '</span>';
+
+  if(d.sheets && d.sheets.length > 1){
+    bar += '<select class="pv-sel" data-sheet-of="' + escapeAttr(name) + '" data-sheet-target="' + idx + '">';
+    d.sheets.forEach(function(s){
+      bar += '<option value="' + escapeAttr(s) + '"' + (s === d.sheet ? ' selected' : '') + '>' + escapeHtml(s) + '</option>';
+    });
+    bar += '</select>';
+  }
+  bar += '</div>';
+
+  let tbl = '<div class="tblwrap"><table class="dt"><thead>';
+  const heads = d.header_rows || [d.header || []];
+  heads.forEach(function(hr){
+    tbl += '<tr>';
+    hr.forEach(function(h){
+      tbl += '<th>' + escapeHtml(String(h || '')) + '</th>';
+    });
+    tbl += '</tr>';
+  });
+  tbl += '</thead><tbody>';
+  (d.rows||[]).forEach(function(row){
+    tbl += '<tr>';
+    row.forEach(function(c){
+      tbl += '<td>' + escapeHtml(String(c==null?'':c)) + '</td>';
+    });
+    tbl += '</tr>';
+  });
+  tbl += '</tbody></table></div>';
+
+  // 分页控件
+  let pager = '';
+  if(d.total_rows > (d.limit || 300)){
+    const off = d.offset || 0;
+    const lim = d.limit || 300;
+    pager = '<div class="pager">' +
+      '<button class="btn ghost sm" data-scope="' + escapeAttr(d.scope || 'outputs') + '" data-page="' + escapeAttr(name) + '" data-target="' + idx +
+        '" data-offset="' + Math.max(0, off - lim) + '"' + (off <= 0 ? ' disabled' : '') + '>上一页</button>' +
+      '<span>第 ' + fromRow + '–' + toRow + ' 行 / 共 ' + d.total_rows + ' 行</span>' +
+      '<button class="btn ghost sm" data-scope="' + escapeAttr(d.scope || 'outputs') + '" data-page="' + escapeAttr(name) + '" data-target="' + idx +
+        '" data-offset="' + (off + lim) + '"' + (d.has_more ? '' : ' disabled') + '>下一页</button>' +
+      '</div>';
+  }
+
+  holder.innerHTML = '<div class="pv">' + bar + tbl + pager + '</div>';
+}
+
+// 分页（事件委托）
+document.addEventListener('click', async function(ev){
+  const btn = ev.target.closest('button[data-page]');
+  if(!btn) return;
+  const name = btn.getAttribute('data-page');
+  const target = btn.getAttribute('data-target');
+  const offset = btn.getAttribute('data-offset');
+  const holder = document.getElementById(target.startsWith('pv-') ? target : ('pv-' + target));
+  const box = document.getElementById(target) || holder;
+  if(!box) return;
+
+  btn.disabled = true;
+  try{
+    const scope = btn.getAttribute('data-scope') || 'outputs';
+    const r = await fetch('/api/preview/' + encodeURIComponent(name) + '?scope=' + encodeURIComponent(scope) + '&offset=' + offset);
+    const d = await r.json();
+    renderPreview(box, d, name, target);
+  }catch(e){
+    box.innerHTML = '<div class="warn">加载失败</div>';
+  }
+});
+
+// sheet 切换（事件委托）
+document.addEventListener('change', async function(ev){
+  const sel = ev.target.closest('select[data-sheet-of]');
+  if(!sel) return;
+
+  const name = sel.getAttribute('data-sheet-of');
+  const holder = document.getElementById('pv-' + sel.getAttribute('data-sheet-target'));
+  if(!holder) return;
+
+  holder.innerHTML = '<div class="pv"><div class="pv-h">加载中…</div></div>';
+  try{
+    const r = await fetch('/api/preview/' + encodeURIComponent(name) +
+                          '?sheet=' + encodeURIComponent(sel.value));
+    const d = await r.json();
+    renderPreview(holder, d, name, sel.getAttribute('data-sheet-target'));
+  }catch(e){
+    holder.innerHTML = '<div class="warn">⚠️ 加载失败</div>';
+  }
+});
+
+// ---- 取数指引卡 ----
+document.addEventListener('click', async function(ev){
+  const btn = ev.target.closest('button[data-guide]');
+  if(!btn) return;
+
+  const key = btn.getAttribute('data-guide');
+  const holder = document.getElementById('guide-' + key);
+  if(!holder) return;
+
+  if(holder.dataset.open === '1'){
+    holder.innerHTML = '';
+    holder.dataset.open = '0';
+    btn.textContent = btn.dataset.origLabel || '取数指引';
+    return;
+  }
+  if(!btn.dataset.origLabel) btn.dataset.origLabel = btn.textContent;
+
+  btn.disabled = true;
+  try{
+    const d = await (await fetch('/api/guide/' + encodeURIComponent(key))).json();
+    holder.dataset.open = '1';
+    btn.textContent = '收起';
+
+    let extra = '';
+    if(d.source_type === 'manual'){
+      try{
+        const tmpl = await (await fetch('/api/templates')).json();
+        const want = key.indexOf('weekly') >= 0 ? '每周活动汇总'
+                   : key.indexOf('sub35') >= 0 ? '3.5潜客转化' : '';
+        const found = (tmpl.files||[]).filter(f => !want || f.name.indexOf(want) >= 0);
+        if(found.length){
+          extra = '<div class="go">📥 下载模板：' + found.map(f =>
+            '<a href="/api/download/' + encodeURIComponent(f.name) + '" ' +
+            'style="color:var(--blue);margin-right:12px;text-decoration:underline;">' +
+            escapeHtml(f.name) + '</a>'
+          ).join('') + '<br><span style="color:var(--ink3);font-size:12px;">填好后用上方「上传数据源」传回平台</span></div>';
+        }
+      }catch(e){}
+    }
+
+    holder.innerHTML = '<div class="guide">' +
+      '<div class="gh">📋 ' + escapeHtml(d.source_label) + '</div>' +
+      '<pre>' + escapeHtml(d.guide) + '</pre>' +
+      (d.outputs_desc ? '<div class="go">产出：' + escapeHtml(d.outputs_desc) + '</div>' : '') +
+      extra +
+      '</div>';
+  }catch(e){
+    holder.innerHTML = '<div class="warn">指引加载失败</div>';
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+function escapeHtml(s){
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// 用于 HTML 属性值（比 escapeHtml 更严格，同样转义引号）
+function escapeAttr(s){
+  return escapeHtml(s);
+}
+</script>
+
+</body>
+</html>

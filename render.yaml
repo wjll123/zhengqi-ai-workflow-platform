@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: zhengqi-ai-workflow
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app.web_app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300
+    healthCheckPath: /healthz
+    envVars:
+      - key: ZQC_HOST
+        value: 0.0.0.0
+      - key: ZQC_DATA_DIR
+        value: /tmp/zqc-data
+      - key: ZQC_PUBLIC_DEPLOYMENT
+        value: "1"

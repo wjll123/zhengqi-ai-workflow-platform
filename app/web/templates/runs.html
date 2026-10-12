@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block nav_runs %}on{% endblock %}
+{% block title %}运行记录 · 政企存量平台{% endblock %}
+
+{% block content %}
+<h1 class="page">运行记录</h1>
+<div class="sub">最近 {{ runs|length }} 条执行记录（保留最近 500 条）</div>
+
+{% if runs %}
+<table>
+  <thead>
+    <tr>
+      <th style="width:17%">时间</th>
+      <th style="width:20%">任务</th>
+      <th style="width:9%">模块</th>
+      <th style="width:9%">状态</th>
+      <th style="width:8%">耗时</th>
+      <th>结果</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in runs %}
+    <tr>
+      <td class="mono">{{ r.started_at }}</td>
+      <td>{{ r.task_name }}</td>
+      <td><span style="color:var(--ink3);font-size:12.5px;">{{ r.module }}</span></td>
+      <td>
+        {% if r.ok %}<span class="tag g">成功</span>{% else %}<span class="tag r">失败</span>{% endif %}
+      </td>
+      <td>{{ r.elapsed }}s</td>
+      <td>{{ r.message }}{% if r.warnings %}<span style="color:var(--amber);"> ⚠️ {{ r.warnings|length }}</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">还没有运行记录</div>
+{% endif %}
+{% endblock %}

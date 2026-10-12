@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+{% block nav_home %}on{% endblock %}
+{% block title %}任务中心 · 政企存量平台{% endblock %}
+
+{% block content %}
+<h1 class="page">任务中心</h1>
+<div class="sub">
+  共 {{ task_count }} 项交付成果。选择要生成的成果，查看所需数据内容，上传数据源后执行。
+</div>
+
+<div class="batchbar">
+  <div class="bb-l">
+    <span class="bb-lb">当前账期</span>
+    <input id="batchInput" class="bb-in" type="text" placeholder="如 202608" maxlength="8">
+    <button class="btn sm" id="btnBatch">保存</button>
+    <span id="batchMsg" class="bb-msg"></span>
+  </div>
+  <div class="bb-r">
+    ⓘ 账期用于标识本次输出；数据源以表格内容识别，文件名可自行命名。
+  </div>
+</div>
+
+<div class="needpanel" id="needPanel" style="display:none;">
+  <div class="np-h">
+    <span class="np-t">本批次待提供的源数据</span>
+    <span class="np-c" id="npCount"></span>
+    <button class="btn ghost sm" id="btnNeedUpload" style="margin-left:auto;">上传数据源</button>
+  </div>
+  <div class="np-b" id="npBody"><span style="color:var(--ink3);">读取中…</span></div>
+</div>
+
+<div class="legend" style="display:none;">
+  <div class="lg-item">
+    <span class="src src-auto">系统导出</span>
+    <span class="lg-text">从 CDAP / 中台导出文件 → 上传 → 执行</span>
+  </div>
+  <div class="lg-item">
+    <span class="src src-semi">需跑SQL</span>
+    <span class="lg-text">按取数指引跑 SQL → 结果上传 → 执行</span>
+  </div>
+  <div class="lg-item">
+    <span class="src src-manual">人工填报</span>
+    <span class="lg-text">下载模板 → 填数据 → 上传 → 执行</span>
+  </div>
+</div>
+
+{% for module, tasks in modules.items() %}
+<div class="grp">
+  <div class="grp-t">{{ module }} · {{ tasks|length }} 个任务</div>
+  <div class="cards">
+    {% for item in tasks %}
+    {% set t = item.task %}
+    <div class="card" data-task="{{ t.key }}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;">
+        <span class="src src-auto">交付成果</span>
+      </div>
+      <h3>{{ item.title }}</h3>
+      <div class="outdesc">
+        <span class="od-lb">需要提供</span>
+        <span class="od-v">
+          {% for label, content in item.needs %}
+          <strong>{{ label }}</strong>：{{ content }}{% if not loop.last %}<br>{% endif %}
+          {% else %}无需额外数据源{% endfor %}
+        </span>
+      </div>
+      <details style="margin-top:10px;font-size:12.5px;color:var(--ink2);">
+        <summary style="cursor:pointer;color:var(--blue);">查看数据源结构{{ '与样例' if item.examples else '' }}</summary>
+        <div style="margin-top:9px;line-height:1.8;">
+          {% for label, content in item.needs %}<div><b>{{ label }}</b>：{{ content }}</div>{% endfor %}
+          {% for example in item.examples %}
+          <div style="margin-top:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <span>{{ example }}</span>
+            <button class="btn ghost sm" data-pv="{{ example }}" data-scope="reference" data-target="ref-{{ t.key }}-{{ loop.index }}">查看样例</button>
+            <a class="btn ghost sm" href="/api/download/{{ example|urlencode }}">下载样例</a>
+          </div>
+          <div id="ref-{{ t.key }}-{{ loop.index }}"></div>
+          {% endfor %}
+        </div>
+      </details>
+      <div class="foot">
+        {% if t.key in ['monthly_report_ppt_tables', 'monthly_4plus2', 'monthly_luozhe_audit'] %}
+        <a href="/task/{{ t.key }}" class="btn sm">执行</a>
+        {% else %}
+        <button class="btn sm" onclick="runTask('{{ t.key }}', this)">执行</button>
+        {% endif %}
+        <button class="btn ghost sm" data-guide="{{ t.key }}">数据说明</button>
+        {% if t.key not in ['monthly_report_ppt_tables', 'monthly_4plus2', 'monthly_luozhe_audit'] %}<a href="/task/{{ t.key }}" class="btn ghost sm">详情</a>{% endif %}
+      </div>
+      <div id="guide-{{ t.key }}"></div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
+<div id="result"></div>
+
+<div class="grp" style="margin-top:34px;">
+  <div class="grp-t">
+    数据与成品
+    <span style="float:right;font-weight:400;text-transform:none;letter-spacing:0;font-size:12.5px;">
+      <button class="btn ghost sm" id="btnUpload">上传数据源</button>
+    </span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+    <button class="btn ghost sm" id="btnDeleteSelected" disabled>删除所选（0）</button>
+    <span class="hint">勾选文件后可批量删除；删除后可撤销。</span>
+    <span id="fileActionMsg" role="status" aria-live="polite" style="font-size:12.5px;color:var(--ink2);"></span>
+  </div>
+  <div class="cards" id="dirs"></div>
+</div>
+
+<script>
+const fileSelection = new Map();
+function fileKey(where,name){return where+'\u0000'+name;}
+function updateSelectionUI(){
+  const button=document.getElementById('btnDeleteSelected');
+  button.disabled=fileSelection.size===0;
+  button.textContent='删除所选（'+fileSelection.size+'）';
+}
+function showFileAction(message,token){
+  document.getElementById('fileActionMsg').innerHTML=escapeHtml(message)+
+    (token?' <button class="btn ghost sm" data-undo="'+escapeAttr(token)+'">撤销删除</button>':'');
+}
+function fmtSize(n){
+  if(n < 1024) return n + ' B';
+  if(n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  return (n/1024/1024).toFixed(1) + ' MB';
+}
+
+async function loadDirs(){
+  const box = document.getElementById('dirs');
+  const [inbox, outputs, templates] = await Promise.all([
+    fetch('/api/inbox').then(r=>r.json()),
+    fetch('/api/outputs').then(r=>r.json()),
+    fetch('/api/templates').then(r=>r.json()).catch(()=>({files:[]}))
+  ]);
+
+  const available=new Set();
+  for(const [where,files] of [['inbox',inbox.files],['outputs',outputs.files],['templates',templates.files]]){
+    for(const file of files) available.add(fileKey(where,typeof file==='string'?file:file.name));
+  }
+  for(const key of fileSelection.keys()) if(!available.has(key)) fileSelection.delete(key);
+  const rowsOf = (files, where, withView) => files.length
+    ? files.map((f,i)=>{
+        const name = (typeof f === 'string') ? f : f.name;
+        const size = (typeof f === 'object' && f.size) ? ' <span class="fsz">' + fmtSize(f.size) + '</span>' : '';
+        const canDelete = where !== 'templates';
+        let h = '<div class="outrow">' + (canDelete ? '<input class="file-pick" type="checkbox" data-file-select data-where="'+
+          where+'" data-name="'+escapeAttr(name)+'" aria-label="选择 '+escapeAttr(name)+'"'+
+          (fileSelection.has(fileKey(where,name))?' checked':'')+'>' : '<span style="width:17px;flex:none;" aria-hidden="true">🔒</span>') + '<span class="fname">' +
+          (where === 'outputs' ? '📄 ' : where === 'templates' ? '📋 ' : '📥 ') +
+          escapeHtml(name) + size + '</span>';
+        const isTable = /\.(xlsx|xls|xlsm|csv)$/i.test(name);
+        if (withView && isTable) {
+          h += '<button class="btn ghost sm" data-pv="' + escapeAttr(name) +
+               '" data-target="pv-' + where + i + '">查看</button>';
+        }
+        h += '<a class="btn ghost sm" href="/api/download/' +
+             encodeURIComponent(name) + '">下载文件</a>';
+        h += canDelete ? '<button class="btn ghost sm" data-del="' + escapeAttr(name) +
+             '" data-where="' + where + '">删除</button></div>' : '<span class="hint">平台模板</span></div>';
+        if (withView && isTable) h += '<div id="pv-' + where + i + '"></div>';
+        return h;
+      }).join('')
+    : '<span style="color:var(--ink3);">（暂无文件）</span>';
+
+  box.innerHTML = `
+    <div class="card" style="cursor:default;grid-column:1/-1;">
+      <h3>成品 outputs <span class="cnt">${outputs.files.length} 个</span>
+        <button class="btn ghost sm" data-select-all="outputs" style="float:right;">全选本组</button></h3>
+      <div style="margin-top:10px;">${rowsOf(outputs.files, 'outputs', true)}</div>
+    </div>
+    <div class="card" style="cursor:default;">
+      <h3>源数据 inbox <span class="cnt">${inbox.files.length} 个</span>
+        <button class="btn ghost sm" data-select-all="inbox" style="float:right;">全选本组</button></h3>
+      <div style="margin-top:10px;">${rowsOf(inbox.files, 'inbox', false)}</div>
+    </div>
+    <div class="card" style="cursor:default;">
+      <h3>模板 <span class="cnt">${templates.files.length} 个</span>
+        <span style="float:right;font-weight:400;font-size:12px;color:var(--ink3);">平台模板受保护</span></h3>
+      <div style="margin-top:10px;">${rowsOf(templates.files||[], 'templates', false)}</div>
+    </div>`;
+  updateSelectionUI();
+}
+
+// 顶部「上传数据源」按钮 → 复用弹窗
+document.getElementById('btnUpload').addEventListener('click', function(){
+  openModal({
+    title: '📥 上传数据源',
+    sub: '上传包含任务所需内容的数据文件；文件名可自行命名',
+    body: '<div class="mdl-sec">' + dropzoneHtml('mdlDrop','mdlFile') + '</div>' +
+          '<div class="mdl-tip">支持 xlsx / xls / csv / txt / pptx / docx，可多选或拖拽。' +
+          '上传后到对应任务点「执行」即可。</div>',
+    key: ''
+  });
+});
+
+document.addEventListener('click', async function(ev){
+  const btn = ev.target.closest('button[data-del]');
+  if(!btn) return;
+  const name = btn.getAttribute('data-del');
+  const where = btn.getAttribute('data-where');
+  if(!confirm('将「' + name + '」移入回收区？可在页面上撤销。')) return;
+  try{
+    const r = await fetch('/api/delete', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, where})
+    });
+    const d = await r.json();
+    if(d.ok){ fileSelection.delete(fileKey(where,name));await loadDirs();showFileAction(d.message,d.undo_token);
+      if(typeof loadSourceStatus==='function')loadSourceStatus();
+      if(typeof loadNeedPanel==='function')loadNeedPanel();
+    } else { showFileAction(d.error || '删除失败'); }
+  }catch(e){ alert('删除失败：' + e); }
+});
+
+document.getElementById('dirs').addEventListener('change',function(ev){
+  const box=ev.target.closest('input[data-file-select]');
+  if(!box)return;
+  const where=box.getAttribute('data-where'),name=box.getAttribute('data-name');
+  const key=fileKey(where,name);
+  if(box.checked)fileSelection.set(key,{where,name});else fileSelection.delete(key);
+  updateSelectionUI();
+});
+document.getElementById('dirs').addEventListener('click',function(ev){
+  const btn=ev.target.closest('button[data-select-all]');
+  if(!btn)return;
+  const where=btn.getAttribute('data-select-all');
+  const boxes=[...document.querySelectorAll('#dirs input[data-file-select]')].filter(x=>x.getAttribute('data-where')===where);
+  const shouldSelect=boxes.some(x=>!x.checked);
+  boxes.forEach(box=>{
+    box.checked=shouldSelect;
+    const name=box.getAttribute('data-name'),key=fileKey(where,name);
+    if(shouldSelect)fileSelection.set(key,{where,name});else fileSelection.delete(key);
+  });
+  btn.textContent=shouldSelect?'取消本组':'全选本组';
+  updateSelectionUI();
+});
+document.getElementById('btnDeleteSelected').addEventListener('click',async function(){
+  const items=[...fileSelection.values()];
+  if(!items.length)return;
+  const preview=items.slice(0,6).map(x=>'• '+x.name).join('\n');
+  if(!confirm('将所选 '+items.length+' 个文件移入回收区？\n'+preview+
+              (items.length>6?'\n…还有 '+(items.length-6)+' 个文件':'')+'\n删除后可撤销。'))return;
+  this.disabled=true;
+  try{
+    const r=await fetch('/api/delete-batch',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({items})});
+    const d=await r.json();
+    if(!d.ok){showFileAction(d.error||'批量删除失败');return;}
+    fileSelection.clear();await loadDirs();showFileAction(d.message,d.undo_token);
+    if(typeof loadSourceStatus==='function')loadSourceStatus();
+    if(typeof loadNeedPanel==='function')loadNeedPanel();
+  }catch(e){showFileAction('批量删除失败：'+e)}finally{updateSelectionUI()}
+});
+document.getElementById('fileActionMsg').addEventListener('click',async function(ev){
+  const btn=ev.target.closest('button[data-undo]');
+  if(!btn)return;
+  btn.disabled=true;
+  try{
+    const r=await fetch('/api/restore-batch',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({undo_token:btn.getAttribute('data-undo')})});
+    const d=await r.json();
+    if(!d.ok){showFileAction(d.error||'撤销失败',btn.getAttribute('data-undo'));return;}
+    await loadDirs();showFileAction(d.message);
+    if(typeof loadSourceStatus==='function')loadSourceStatus();
+    if(typeof loadNeedPanel==='function')loadNeedPanel();
+  }catch(e){showFileAction('撤销失败：'+e,btn.getAttribute('data-undo'))}
+});
+
+loadDirs();
+
+// ---------------- 源数据就绪状态 ----------------
+async function loadSourceStatus(){
+  let list = [];
+  try{
+    list = await (await fetch('/api/sources')).json();
+  }catch(e){ return; }
+
+  list.forEach(function(x){
+    const dot = document.querySelector('[data-srcdot="' + x.key + '"]');
+    if(dot){
+      if(x.ready){
+        dot.className = 'srcdot srcdot-ok';
+        dot.textContent = '源就绪';
+        dot.title = x.total + ' 项源数据已齐备';
+      }else{
+        dot.className = 'srcdot srcdot-miss';
+        dot.textContent = '缺 ' + x.missing.length + ' 项源';
+        dot.title = '缺少：' + x.missing.join('、');
+      }
+    }
+  });
+}
+
+// 点「源就绪 / 缺 N 项源」徽标 → 展开明细
+document.addEventListener('click', async function(ev){
+  const dot = ev.target.closest('[data-srcdot]');
+  if(!dot) return;
+  const key = dot.getAttribute('data-srcdot');
+  const blk = document.querySelector('[data-srcblock="' + key + '"]');
+  if(!blk) return;
+
+  if(blk.style.display !== 'none'){ blk.style.display = 'none'; blk.innerHTML=''; return; }
+
+  blk.innerHTML = '<div style="font-size:12.5px;color:var(--ink3);">读取中…</div>';
+  blk.style.display = 'block';
+  try{
+    const d = await (await fetch('/api/sources/' + encodeURIComponent(key))).json();
+    if(!d.ok){ blk.innerHTML = '<div class="warn">读取失败</div>'; return; }
+    let h = '<div style="font-size:12px;color:var(--ink3);margin-bottom:6px;">本批次需要以下源数据' +
+            (d.batch ? '（账期 ' + escapeHtml(d.batch) + '）' : '') + '：</div>';
+    d.items.forEach(function(i){
+      h += '<div class="sic"><span class="siicon" style="color:' + (i.found?'var(--green)':'var(--red)') + ';">' +
+           (i.found ? '✓' : '✗') + '</span>' +
+           '<span class="siname">' + escapeHtml(i.label) + '</span>' +
+           '<span class="sifile">' + (i.found ? escapeHtml(i.file) : '未提供') + '</span></div>';
+    });
+    if(!d.ready){
+      h += '<div class="warn" style="margin-top:8px;">请先在上方「上传数据源」补齐缺失的源，再执行本任务。' +
+           (d.batch ? '文件名需含账期 <b>' + escapeHtml(d.batch) + '</b>。' : '') + '</div>';
+    }
+    blk.innerHTML = h;
+  }catch(e){
+    blk.innerHTML = '<div class="warn">读取失败：' + escapeHtml(String(e)) + '</div>';
+  }
+});
+
+// 挂到全局，供 base.html 的弹窗重试时调用
+window.loadSourceStatus = loadSourceStatus;
+loadSourceStatus();
+
+// ---------------- 当前账期 ----------------
+async function loadBatch(){
+  try{
+    const d = await (await fetch('/api/batch')).json();
+    if(d.ok) document.getElementById('batchInput').value = d.batch || '';
+  }catch(e){}
+}
+
+document.getElementById('btnBatch').addEventListener('click', async function(){
+  const v = document.getElementById('batchInput').value.trim();
+  const msg = document.getElementById('batchMsg');
+  if(!v){ msg.innerHTML = '<span style="color:var(--red);">账期不能为空</span>'; return; }
+  try{
+    const r = await fetch('/api/batch', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({batch: v})
+    });
+    const d = await r.json();
+    if(d.ok){
+      msg.innerHTML = '<span style="color:var(--green);">已保存：' + escapeHtml(d.batch) + '</span>';
+      loadSourceStatus();       // 账期变了，源状态要重算
+      setTimeout(()=>{ msg.textContent=''; }, 2500);
+    }else{
+      msg.innerHTML = '<span style="color:var(--red);">' + escapeHtml(d.error||'保存失败') + '</span>';
+    }
+  }catch(e){
+    msg.innerHTML = '<span style="color:var(--red);">保存失败</span>';
+  }
+});
+
+// ---------------- 本批次待源总览 ----------------
+async function loadNeedPanel(){
+  const body = document.getElementById('npBody');
+  const cnt  = document.getElementById('npCount');
+  let list = [];
+  try{
+    list = await (await fetch('/api/sources')).json();
+  }catch(e){ body.innerHTML = '<span style="color:var(--red);">读取失败</span>'; return; }
+
+  const pending = list.filter(x => !x.ready);
+  if(!pending.length){
+    cnt.innerHTML = '<span style="color:var(--green);">全部就绪</span>';
+    body.innerHTML = '<div style="color:var(--green);font-size:13px;">✓ 所有任务的源数据都已齐备，可以直接执行。</div>';
+    return;
+  }
+
+  cnt.innerHTML = '<span style="color:var(--red);">' + pending.length + ' 个任务待源</span>';
+
+  // 汇总各任务缺的源，去重
+  const allMiss = [];
+  pending.forEach(x => x.missing.forEach(m => { if(allMiss.indexOf(m) < 0) allMiss.push(m); }));
+
+  let h = '<div class="np-chips">';
+  allMiss.forEach(function(m){
+    h += '<span class="np-chip">' + escapeHtml(m) + '</span>';
+  });
+  h += '</div>';
+  h += '<div class="np-tip">这些是本批次还缺的数据源。准备好后点右上角「上传数据源」，' +
+       '上传成功后各任务的「源就绪」徽标会自动变绿。</div>';
+  body.innerHTML = h;
+}
+
+window.loadNeedPanel = loadNeedPanel;
+loadNeedPanel();
+
+// 面板上的上传按钮 → 复用弹窗
+document.getElementById('btnNeedUpload').addEventListener('click', function(){
+  if(typeof openModal !== 'function'){ alert('请刷新页面后重试'); return; }
+  openModal({
+    title: '📥 上传数据源',
+    sub: '上传本批次的新数据源（文件名需含当前账期）',
+    body: (typeof dropzoneHtml === 'function' ? '<div class="mdl-sec">' + dropzoneHtml('mdlDrop','mdlFile') + '</div>' : '') +
+          '<div class="mdl-tip">支持 xlsx / xls / csv / txt。上传后源状态会自动刷新。</div>',
+    key: ''
+  });
+});
+
+loadBatch();
+</script>
+{% endblock %}
