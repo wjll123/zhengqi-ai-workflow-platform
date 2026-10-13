@@ -15,6 +15,13 @@ data/state
 data/trash
 data/config
 
-# 仅保留已提交的计算模板与预置历史底稿（聚合表，非客户原始数据）
-data/templates/**
-data/seed/**
+# 计算模板和预置历史底稿是镜像启动所需的部署资产，必须进入构建上下文；
+# 仅排除客户源数据和运行时生成的结果。
+!data/templates/
+!data/templates/**
+!data/seed/
+!data/seed/**
+
+# 离线依赖包（pip whl + Node tarball）是镜像构建所需资产，必须进入构建上下文。
+!offline_packages/
+!offline_packages/**

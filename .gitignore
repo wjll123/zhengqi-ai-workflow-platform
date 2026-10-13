@@ -21,3 +21,8 @@ docs/**/*.pptx
 docs/**/*.zip
 docs/*.docx
 .render/
+
+# docker compose 本地持久化数据（宿主机挂载目录，非仓库内容）
+zqc-data/
+# compose 环境变量文件（可能含私有 npm 源 token，勿入库）
+.env

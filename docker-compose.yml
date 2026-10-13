@@ -1,0 +1,44 @@
+# 政企存量平台 · 本地 / 自托管 Docker Compose 编排
+# 与 Render（render.yaml, runtime: docker）共用同一份 Dockerfile。
+# 月报私有 npm 源凭据通过 build args 传入，取自当前 shell 环境或 .env 文件（不写死在仓库）。
+#
+# 用法：
+#   1) 在项目根目录准备凭据（任选其一）：
+#      a. 导出环境变量： export NPM_REGISTRY_URL=... NPM_TOKEN=...
+#      b. 创建 .env 文件： NPM_REGISTRY_URL=... \n NPM_TOKEN=...
+#      （落责等纯 Python 任务不需要这两个变量，留空也能起）
+#   2) docker compose build
+#   3) docker compose up -d
+#   4) 浏览器打开 http://localhost:8848  （容器内固定 10000，映射到宿主机 8848）
+
+services:
+  zhengqi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # 取 shell / .env 中的变量；未设置则传空，artifact-tool 跳过安装（月报降级，其余任务不受影响）
+        NPM_REGISTRY_URL: ${NPM_REGISTRY_URL:-}
+        NPM_TOKEN: ${NPM_TOKEN:-}
+    image: zhengqi-ai-workflow:latest
+    container_name: zhengqi-ai-workflow
+    ports:
+      - "8848:10000"          # 宿主机 8848 -> 容器 10000（entrypoint 绑 ${PORT:-10000}）
+    environment:
+      PORT: "10000"
+      ZQC_HOST: "0.0.0.0"
+      ZQC_DATA_DIR: "/tmp/zqc-data"
+      ZQC_PUBLIC_DEPLOYMENT: "1"
+      ZQC_ARTIFACT_NODE: "/usr/local/bin/node"
+      ZQC_ARTIFACT_NODE_MODULES: "/opt/artifact/node_modules"
+    volumes:
+      # 宿主机挂载，避免容器重启/重建后 inbox、outputs、state（调度台账）丢失。
+      # entrypoint 用 cp -n 铺设模板与底稿，首次为空目录时自动铺入，之后不覆盖用户数据。
+      - ./zqc-data:/tmp/zqc-data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/healthz", "||", "exit", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s      # 首启含 gunicorn 冷启动 + 模板铺设，给足时间
+    restart: unless-stopped
