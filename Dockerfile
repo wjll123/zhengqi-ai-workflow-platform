@@ -33,15 +33,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 该包为 OpenAI Codex 内部私有包，无公开 npm 源；方案改为搬运你本机已装好的目录。
 # 本地打包时务必删除嵌套的 node_modules/skia-canvas（macOS 原生 .node 在 Linux 上不可用，
 # 且月报只用到公式引擎 wasm，不触发渲染，删之无影响）。
-# 下列两个变量请在 Render 后台「Environment」中设置（构建期可用，令牌不落盘到镜像）：
-#   ARTIFACT_GIT_URL    = https://github.com/<you>/artifact-tool-private.git
-#   ARTIFACT_GIT_TOKEN  = <私有仓库只读 PAT>
+# 下列两个变量请在构建环境「Environment」中设置（构建期可用，令牌不落盘到镜像）：
+#   ARTIFACT_GIT_URL    = 私有仓库 URL（内网 GitLab 或外网 GitHub 均可；内网地址会被自动直连，不走代理）
+#   ARTIFACT_GIT_TOKEN  = <私有仓库只读 PAT / oauth2 密码>
 ARG ARTIFACT_GIT_URL
 ARG ARTIFACT_GIT_TOKEN
 RUN set -eux; \
     if [ -n "$ARTIFACT_GIT_URL" ] && [ -n "$ARTIFACT_GIT_TOKEN" ]; then \
       mkdir -p /opt/artifact/node_modules/@oai; \
       CLONE_URL=$(echo "$ARTIFACT_GIT_URL" | sed -E "s#(https?://)#\1oauth2:${ARTIFACT_GIT_TOKEN}@#"); \
+      export no_proxy="172.18.101.172,172.18.101.170,localhost,127.0.0.1"; \
       rm -rf /tmp/artifact-tool && \
       git clone --depth 1 "$CLONE_URL" /tmp/artifact-tool 2>/dev/null && \
       cp -R /tmp/artifact-tool /opt/artifact/node_modules/@oai/artifact-tool && \
