@@ -1,17 +1,26 @@
-# 政企存量平台 · Docker 部署（离线依赖版）
-# 特性：pip 依赖 + Node 均从仓库内 offline_packages/ 离线安装，构建机无需公网 pip/node。
-# 仅 artifact-tool（OpenAI Codex 私有包）需从私有 Git 仓库拉取。
+# 政企存量平台 · Docker 部署（全离线版）
+# 特性：系统依赖(deb) + Python 依赖(whl) + Node 全部从仓库内 offline_packages/ 离线安装，
+# 构建机无需访问 apt 源 / pip 源 / nodejs.org。
+# 仅 artifact-tool（OpenAI Codex 私有包）需从私有 Git 仓库拉取（若提供 URL+Token）。
 
 FROM python:3.11-slim
 
-# ---- 系统依赖 ----
-# git：构建期从私有仓库拉取已打包的 artifact-tool（唯一需要网络的步骤，见文末 no_proxy）。
-# libcairo 等：artifact-tool 嵌套 skia-canvas 的运行时库（月报不触发渲染，保留以防边缘路径）。
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates gnupg git xz-utils \
-    libcairo2 libjpeg62-turbo libpango-1.0-0 libpangocairo-1.0-0 \
-    libgif7 libgomp1 fonts-liberation \
-    && rm -rf /var/lib/apt/lists/*
+# ---- 系统依赖（全离线：本地 deb + dpkg 安装，不访问 apt 源）----
+# vendor_debs/ 含 bookworm/amd64 全量递归依赖（128 个 deb，源自阿里云镜像）。
+# git：拉取 artifact-tool 用；libcairo 等：artifact-tool 嵌套 skia-canvas 的运行时库。
+# dpkg -i 多轮重试以处理依赖顺序（离线无 apt 源，故不能用 apt-get install -f 补依赖）。
+COPY vendor_debs/ /tmp/debs/
+RUN set -eux; \
+    for i in $(seq 1 12); do \
+      if dpkg -i /tmp/debs/*.deb >/dev/null 2>&1; then break; fi; \
+    done; \
+    dpkg --configure -a; \
+    dpkg -i /tmp/debs/*.deb || true; \
+    rm -rf /tmp/debs; \
+    echo "---- 强制校验：关键命令/库必须存在，否则构建失败 ----"; \
+    command -v git && command -v curl && command -v xz; \
+    ldconfig -p | grep -q libcairo.so && echo "libcairo OK"; \
+    ldconfig -p | grep -q libgomp.so && echo "libgomp OK"
 
 WORKDIR /app
 
@@ -59,8 +68,8 @@ RUN set -eux; \
 # ---- ④ 应用代码 ----
 COPY . .
 
-# 清理构建期资产，避免离线包（含 32MB Node tarball）残留进运行镜像
-RUN rm -rf /app/offline_packages
+# 清理构建期资产，避免离线包（whl + Node tarball + deb）残留进运行镜像
+RUN rm -rf /app/offline_packages /app/vendor_debs
 
 # 运行时定位 artifact-tool（与 app/modules/monthly_4plus2.py 读取的环境变量一致）
 ENV ZQC_ARTIFACT_NODE=/usr/local/bin/node
