@@ -5,11 +5,10 @@
 FROM python:3.11-slim
 
 # ---- 系统依赖 ----
-# skia-canvas（artifact-tool 的间接原生依赖）在 Linux 上需要这些运行时库。
-# 若 npm install 仍触发 skia-canvas 源码编译，可临时在下方 npm install 后加 --ignore-scripts
-# （月报只用到 artifact-tool 的 Excel 公式引擎 wasm，不触发 skia-canvas 渲染，通常不影响）。
+# git：构建期从私有仓库拉取已打包的 artifact-tool。
+# libcairo 等：artifact-tool 嵌套依赖 skia-canvas 的运行时库（月报不触发渲染，但保留以防边缘路径）。
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates gnupg \
+    curl ca-certificates gnupg git \
     libcairo2 libjpeg62-turbo libpango-1.0-0 libpangocairo-1.0-0 \
     libgif7 libgomp1 fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
@@ -26,23 +25,26 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ---- 通过私有 npm 源安装 @oai/artifact-tool ----
-# 下列两个变量请在 Render 后台「Environment」中设置（构建期可用，令牌不落盘到镜像外）：
-#   NPM_REGISTRY_URL = https://<你的私有registry>/<path>/
-#   NPM_TOKEN        = <私有源访问令牌>
-# 若私有源未提供 Linux 原生预编译的 skia-canvas，可改成 `npm install @oai/artifact-tool --ignore-scripts`。
-ARG NPM_REGISTRY_URL
-ARG NPM_TOKEN
+# ---- 从私有 Git 仓库拉取已打包的 @oai/artifact-tool（纯 JS/wasm，跨平台）----
+# 该包为 OpenAI Codex 内部私有包，无公开 npm 源；方案改为搬运你本机已装好的目录。
+# 本地打包时务必删除嵌套的 node_modules/skia-canvas（macOS 原生 .node 在 Linux 上不可用，
+# 且月报只用到公式引擎 wasm，不触发渲染，删之无影响）。
+# 下列两个变量请在 Render 后台「Environment」中设置（构建期可用，令牌不落盘到镜像）：
+#   ARTIFACT_GIT_URL    = https://github.com/<you>/artifact-tool-private.git
+#   ARTIFACT_GIT_TOKEN  = <私有仓库只读 PAT>
+ARG ARTIFACT_GIT_URL
+ARG ARTIFACT_GIT_TOKEN
 RUN set -eux; \
-    if [ -n "$NPM_REGISTRY_URL" ] && [ -n "$NPM_TOKEN" ]; then \
-      npm config set @oai:registry "$NPM_REGISTRY_URL"; \
-      AUTH_HOST=$(echo "$NPM_REGISTRY_URL" | sed -E 's#^https?://##; s#/.*##'); \
-      AUTH_PATH=$(echo "$NPM_REGISTRY_URL" | sed -E 's#^https?://##; s#^[^/]+##; s#/+$##'); \
-      npm config set "//${AUTH_HOST}${AUTH_PATH}:_authToken" "$NPM_TOKEN"; \
-      mkdir -p /opt/artifact && cd /opt/artifact && npm init -y >/dev/null 2>&1 \
-        && npm install @oai/artifact-tool || echo "WARN: @oai/artifact-tool 安装失败（私有源不可达或令牌错误），月报将运行时降级，其余任务不受影响。"; \
+    if [ -n "$ARTIFACT_GIT_URL" ] && [ -n "$ARTIFACT_GIT_TOKEN" ]; then \
+      mkdir -p /opt/artifact/node_modules/@oai; \
+      CLONE_URL=$(echo "$ARTIFACT_GIT_URL" | sed -E "s#(https?://)#\1oauth2:${ARTIFACT_GIT_TOKEN}@#"); \
+      rm -rf /tmp/artifact-tool && \
+      git clone --depth 1 "$CLONE_URL" /tmp/artifact-tool 2>/dev/null && \
+      cp -R /tmp/artifact-tool /opt/artifact/node_modules/@oai/artifact-tool && \
+      rm -rf /opt/artifact/node_modules/@oai/artifact-tool/node_modules/skia-canvas && \
+      echo "OK: artifact-tool 已就位（已移除 skia-canvas 原生模块）"; \
     else \
-      echo "WARN: 未提供 NPM_REGISTRY_URL / NPM_TOKEN，月报（4+2 收客保月报）将不可用，其余任务正常。"; \
+      echo "WARN: 未提供 ARTIFACT_GIT_URL / ARTIFACT_GIT_TOKEN，月报（4+2 收客保月报）将运行时降级，其余任务正常。"; \
     fi
 
 # ---- 应用代码 ----
