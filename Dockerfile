@@ -2,25 +2,30 @@
 # 特性：系统依赖(deb) + Python 依赖(whl) + Node 全部从仓库内 offline_packages/ 离线安装，
 # 构建机无需访问 apt 源 / pip 源 / nodejs.org。
 # 仅 artifact-tool（OpenAI Codex 私有包）需从私有 Git 仓库拉取（若提供 URL+Token）。
-
-FROM python:3.11-slim
+#
+# ⚠️ 基础镜像必须锁定 Debian 版本：vendor_debs/ 的 deb 是 bookworm(12)/amd64 编译的，
+#    与基础镜像 glibc 必须匹配。裸 tag `python:3.11-slim` 会随上游漂移到 trixie(13)，导致 deb 装不上。
+#    故显式锁 `python:3.11-slim-bookworm`。升级基础镜像时须同步重下对应版本的 deb。
+FROM python:3.11-slim-bookworm
 
 # ---- 系统依赖（全离线：本地 deb + dpkg 安装，不访问 apt 源）----
-# vendor_debs/ 含 bookworm/amd64 全量递归依赖（128 个 deb，源自阿里云镜像）。
+# vendor_debs/ 含 bookworm(12)/amd64 全量递归依赖（128 个 deb，源自阿里云镜像）。
 # git：拉取 artifact-tool 用；libcairo 等：artifact-tool 嵌套 skia-canvas 的运行时库。
-# dpkg -i 多轮重试以处理依赖顺序（离线无 apt 源，故不能用 apt-get install -f 补依赖）。
+# 安装策略：多轮 dpkg -i（解决依赖顺序 + base 镜像已内置的包会被 dpkg 识别为"已装/升级"），
+# 离线无 apt 源故不能用 apt-get install -f 补依赖；末尾按需 configure 并强制校验。
 COPY vendor_debs/ /tmp/debs/
 RUN set -eux; \
     for i in $(seq 1 12); do \
-      if dpkg -i /tmp/debs/*.deb >/dev/null 2>&1; then break; fi; \
+      if dpkg -i --force-depends /tmp/debs/*.deb >/dev/null 2>&1; then break; fi; \
     done; \
-    dpkg --configure -a; \
-    dpkg -i /tmp/debs/*.deb || true; \
+    dpkg --configure -a || true; \
+    dpkg -i --force-depends /tmp/debs/*.deb || true; \
     rm -rf /tmp/debs; \
     echo "---- 强制校验：关键命令/库必须存在，否则构建失败 ----"; \
     command -v git && command -v curl && command -v xz; \
     ldconfig -p | grep -q libcairo.so && echo "libcairo OK"; \
-    ldconfig -p | grep -q libgomp.so && echo "libgomp OK"
+    ldconfig -p | grep -q libgomp.so && echo "libgomp OK"; \
+    ldconfig -p | grep -q libpango-1.0.so && echo "libpango OK"
 
 WORKDIR /app
 
