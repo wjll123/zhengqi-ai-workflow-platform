@@ -4,6 +4,10 @@
 
 FROM python:3.11-slim
 
+# 内网代理（构建时需要访问外网下载依赖）
+ENV HTTP_PROXY=http://172.18.101.170:3128
+ENV HTTPS_PROXY=http://172.18.101.170:3128
+
 # ---- 系统依赖 ----
 # skia-canvas（artifact-tool 的间接原生依赖）在 Linux 上需要这些运行时库。
 # 若 npm install 仍触发 skia-canvas 源码编译，可临时在下方 npm install 后加 --ignore-scripts
