@@ -54,12 +54,14 @@ RUN tar -xJf ./offline_packages/node-v24.10.0-linux-x64.tar.xz -C /opt \
 #   ARTIFACT_GIT_URL    = 私有仓库 URL（内网 GitLab 或外网 GitHub；内网地址自动直连不走代理）
 #   ARTIFACT_GIT_TOKEN  = 私有仓库只读 PAT / oauth2 密码
 # 唯一需要网络的步骤：若构建环境在公网墙内，请在下方 RUN 前按需注入代理（见注释）。
-ARG ARTIFACT_GIT_URL
-ARG ARTIFACT_GIT_TOKEN
+# 注意：ARG 给默认空值，且用 ${VAR:-} 取值——否则 set -u 下未传该 ARG 会直接报
+#       "parameter not set" 导致构建失败（不会走到 else 分支）。
+ARG ARTIFACT_GIT_URL=""
+ARG ARTIFACT_GIT_TOKEN=""
 RUN set -eux; \
-    if [ -n "$ARTIFACT_GIT_URL" ] && [ -n "$ARTIFACT_GIT_TOKEN" ]; then \
+    if [ -n "${ARTIFACT_GIT_URL:-}" ] && [ -n "${ARTIFACT_GIT_TOKEN:-}" ]; then \
       mkdir -p /opt/artifact/node_modules/@oai; \
-      CLONE_URL=$(echo "$ARTIFACT_GIT_URL" | sed -E "s#(https?://)#\1oauth2:${ARTIFACT_GIT_TOKEN}@#"); \
+      CLONE_URL=$(echo "${ARTIFACT_GIT_URL}" | sed -E "s#(https?://)#\1oauth2:${ARTIFACT_GIT_TOKEN}@#"); \
       export no_proxy="172.18.101.172,172.18.101.170,localhost,127.0.0.1"; \
       rm -rf /tmp/artifact-tool && \
       git clone --depth 1 "$CLONE_URL" /tmp/artifact-tool 2>/dev/null && \
