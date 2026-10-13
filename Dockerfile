@@ -4,6 +4,10 @@
 
 FROM python:3.11-slim
 
+# 内网代理（构建时需要访问外网下载依赖）
+ENV HTTP_PROXY=http://172.18.101.170:3128
+ENV HTTPS_PROXY=http://172.18.101.170:3128
+
 # ---- 系统依赖 ----
 # git：构建期从私有仓库拉取已打包的 artifact-tool（唯一需要网络的步骤，见文末 no_proxy）。
 # libcairo 等：artifact-tool 嵌套 skia-canvas 的运行时库（月报不触发渲染，保留以防边缘路径）。
