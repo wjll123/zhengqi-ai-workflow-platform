@@ -1,11 +1,15 @@
 """政企存量平台 · Flask 应用入口"""
 from __future__ import annotations
 
+import hmac
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, render_template, request
 
-from .core.config import HOST, PORT, DEBUG, INBOX_DIR, OUTPUT_DIR, TEMPLATE_DIR, REFERENCE_DIR, LOG_FILE, TRASH_DIR
+from .core.config import (
+    HOST, PORT, DEBUG, INBOX_DIR, OUTPUT_DIR, TEMPLATE_DIR, REFERENCE_DIR, LOG_FILE, TRASH_DIR,
+    AUTH_ENABLED, AUTH_USER, AUTH_PASS, AUTH_WHITELIST,
+)
 from .core.file_trash import FileTrashError, move_many, restore_many
 from .core.task_catalog import view_for
 from .core.logger import get_logger, setup_logging
@@ -31,6 +35,26 @@ def _visible_files(d: Path) -> list[str]:
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
     app.config["JSON_AS_ASCII"] = False
+
+    # ------------------------------------------------------------ 访问鉴权
+    # HTTP Basic 全站鉴权：仅当配置了 ZQC_AUTH_USER + ZQC_AUTH_PASS 时启用。
+    # 未配置 -> 完全放行（本地开发不受影响）。放行路径见 AUTH_WHITELIST（探针）。
+    @app.before_request
+    def _require_auth():
+        if not AUTH_ENABLED:
+            return None
+        if request.path in AUTH_WHITELIST:
+            return None
+        auth = request.authorization
+        ok = bool(auth) and auth.type == "basic" and \
+            hmac.compare_digest(auth.username or "", AUTH_USER) and \
+            hmac.compare_digest(auth.password or "", AUTH_PASS)
+        if ok:
+            return None
+        return Response(
+            "需要登录后才能访问", 401,
+            {"WWW-Authenticate": 'Basic realm="政企存量平台", charset="UTF-8"'},
+        )
 
     # 加载所有模块（注册任务）
     from .modules import load_all

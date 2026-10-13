@@ -85,6 +85,11 @@ ENV ZQC_DATA_DIR=/tmp/zqc-data
 ENV ZQC_PUBLIC_DEPLOYMENT=1
 ENV ZQC_HOST=0.0.0.0
 
+# 访问鉴权（HTTP Basic）默认空值 = 不鉴权；运行时用 -e / compose environment 注入即可启用：
+#   docker run -e ZQC_AUTH_USER=admin -e ZQC_AUTH_PASS=<密码> ...
+ENV ZQC_AUTH_USER=""
+ENV ZQC_AUTH_PASS=""
+
 # 注意：如需构建期出网（如 git clone 外网仓库），在此行前加：
 #   ENV HTTP_PROXY=http://<your-proxy>:<port>
 #   ENV HTTPS_PROXY=http://<your-proxy>:<port>

@@ -24,6 +24,14 @@ HOST = os.environ.get("ZQC_HOST", "127.0.0.1")
 PORT = int(os.environ.get("ZQC_PORT", "8848"))
 DEBUG = os.environ.get("ZQC_DEBUG", "0") == "1"
 
+# 访问鉴权（HTTP Basic）
+# 同时设置 ZQC_AUTH_USER 与 ZQC_AUTH_PASS 才启用；任一为空则鉴权关闭（本地开发不受影响）。
+AUTH_USER = os.environ.get("ZQC_AUTH_USER", "").strip()
+AUTH_PASS = os.environ.get("ZQC_AUTH_PASS", "")
+AUTH_ENABLED = bool(AUTH_USER and AUTH_PASS)
+# 放行路径（探针等不可被鉴权拦截）
+AUTH_WHITELIST = {"/healthz"}
+
 # 日志
 LOG_LEVEL = os.environ.get("ZQC_LOG_LEVEL", "INFO")
 LOG_FILE = LOG_DIR / "platform.log"

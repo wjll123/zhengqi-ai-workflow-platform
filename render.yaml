@@ -12,11 +12,19 @@ services:
         value: /tmp/zqc-data
       - key: ZQC_PUBLIC_DEPLOYMENT
         value: "1"
-      # 以下两个为私有 npm 源凭据，请在 Render 后台 Environment 中设置（构建期可用）：
-      #   NPM_REGISTRY_URL = https://<你的私有registry>/<path>/
-      #   NPM_TOKEN        = <私有源访问令牌>
-      # 不建议写死在仓库；若写在此处，请务必设置为 secret。
-      - key: NPM_REGISTRY_URL
+
+      # ---- 访问鉴权（HTTP Basic）----
+      # 两者都设置才启用鉴权；留空 = 不鉴权（任何人可访问）。
+      # 请在此处或 Render 后台 Environment 中设置，密码务必设为 secret。
+      - key: ZQC_AUTH_USER
         sync: false
-      - key: NPM_TOKEN
+      - key: ZQC_AUTH_PASS
+        sync: false
+
+      # ---- 月报 artifact-tool（可选）----
+      # 月报依赖 OpenAI 私有包 @oai/artifact-tool，需你把它推到一个私有 Git 仓库后在此配置。
+      # 不配置则月报运行时降级，其余任务（落责等）正常。
+      - key: ARTIFACT_GIT_URL
+        sync: false
+      - key: ARTIFACT_GIT_TOKEN
         sync: false
