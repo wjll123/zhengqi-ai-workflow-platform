@@ -2,7 +2,7 @@
 # 与 python runtime 版的区别：额外内置 Node 24 + 私有 @oai/artifact-tool，
 # 让「政企存量 4+2 收客保月报」也能在公开链接上计算（落责数据更新/落责审计等其余任务本就用 openpyxl/python-pptx，照常可用）。
 
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # ---- 系统依赖 ----
 # skia-canvas（artifact-tool 的间接原生依赖）在 Linux 上需要这些运行时库。
