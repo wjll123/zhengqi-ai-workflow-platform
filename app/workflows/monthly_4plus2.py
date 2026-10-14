@@ -4,8 +4,11 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
+import urllib.error
+import urllib.request
 from copy import copy
 from datetime import date, datetime
 from pathlib import Path
@@ -113,8 +116,55 @@ def _set_formula_cache(path: Path, original: Path | None,
     replacement.replace(path)
 
 
+def _recalc_remote(url: str, input_path: Path, timeout: int = 300) -> bytes:
+    """通过远端 LibreOffice 转换服务重算工作簿（POST /，multipart 字段 file，?format=xlsx）。
+
+    该服务默认把上传文件转成 docx，必须带 ?format=xlsx 才返回重算后的 xlsx。
+    返回重算后的 xlsx 文件流；任何失败统一抛 ValueError，
+    与本地 soffice 失败时保持一致的错误语义。
+    """
+    if "format=" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}format=xlsx"
+    with open(input_path, "rb") as handle:
+        payload = handle.read()
+    boundary = "----zqcLibreofficeBoundary7Q2k9"
+    body = (
+        f"--{boundary}\r\n".encode("utf-8")
+        + f'Content-Disposition: form-data; name="file"; filename="{input_path.name}"\r\n'.encode("utf-8")
+        + b"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n"
+        + b"\r\n"
+        + payload
+        + f"\r\n--{boundary}--\r\n".encode("utf-8")
+    )
+    request = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}",
+                 "User-Agent": "zqc-platform/1.0"},
+        method="POST",
+    )
+    # 强制直连，不使用环境里的 http_proxy/https_proxy：该 LibreOffice 服务位于
+    # 内网，部署服务器应直连它；测试机上的本地调试代理（如 WorkBuddy 代理）
+    # 会误拦对内网 IP 的 POST 请求。
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(request, timeout=timeout) as response:
+            data = response.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:600]
+        raise ValueError(f"远端 LibreOffice 转换失败（HTTP {exc.code}）：{detail}")
+    except (urllib.error.URLError, socket.timeout, TimeoutError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise ValueError(f"远端 LibreOffice 连接失败：{reason}")
+    if not data.startswith(b"PK"):
+        raise ValueError(f"远端 LibreOffice 返回非 xlsx 内容：{data[:200]!r}")
+    return data
+
+
 def _calculate(template: Path, values: list[tuple[str, int, int, list[list]]],
-               work_dir: Path, name: str, soffice: str) -> Path:
+               work_dir: Path, name: str, soffice: str | None = None,
+               libreoffice_url: str | None = None) -> Path:
     source_dir = work_dir / f"{name}-source"
     result_dir = work_dir / f"{name}-calculated"
     source_dir.mkdir()
@@ -135,6 +185,11 @@ def _calculate(template: Path, values: list[tuple[str, int, int, list[list]]],
     input_path = source_dir / f"{name}.xlsx"
     book.save(input_path)
     book.close()
+    if libreoffice_url:
+        raw = _recalc_remote(libreoffice_url, input_path)
+        output_path = result_dir / input_path.name
+        output_path.write_bytes(raw)
+        return output_path
     profile = work_dir / f"{name}-lo-profile"
     command = [soffice, f"-env:UserInstallation={profile.as_uri()}", "--headless",
                "--convert-to", "xlsx", "--outdir", str(result_dir), str(input_path)]
@@ -167,10 +222,14 @@ def _trend(value: float) -> str:
     return f"下降{_fmt(-value)}" if value < 0 else f"上升{_fmt(value)}"
 
 
-def run(config: dict, soffice: str | None = None) -> dict:
-    soffice = soffice or os.environ.get("ZQC_SOFFICE") or shutil.which("soffice")
-    if not soffice or not Path(soffice).is_file():
-        raise ValueError("缺少 LibreOffice；请安装后设置 ZQC_SOFFICE 为 soffice 可执行文件路径")
+def run(config: dict, soffice: str | None = None, libreoffice_url: str | None = None) -> dict:
+    libreoffice_url = libreoffice_url or os.environ.get("LIBREOFFICE_URL")
+    if libreoffice_url:
+        soffice = None  # 远端模式不依赖本地 soffice
+    else:
+        soffice = soffice or os.environ.get("ZQC_SOFFICE") or shutil.which("soffice")
+        if not soffice or not Path(soffice).is_file():
+            raise ValueError("缺少 LibreOffice；请设置 LIBREOFFICE_URL（远端转换服务）或 ZQC_SOFFICE（本地 soffice 路径）")
     year, month = int(config["batch"][:4]), int(config["batch"][4:])
     short = f"{year % 100:02d}{month:02d}"
     period_date = date(year, month, 1)
@@ -203,13 +262,13 @@ def run(config: dict, soffice: str | None = None) -> dict:
             ("拍照客户_客户级", 6, 1, source["full"]),
             ("拍照客户_业务级", 9, 1, source["business"]),
             ("模板", 1, 2, [[month]]),
-        ], work, "benchmark", soffice)
+        ], work, "benchmark", soffice, libreoffice_url)
         tracker_calc = _calculate(refs["trackerTemplate"], [
             ("全量客户（客户级）", 6, 1, source["full"]),
             ("全量客户（业务级）", 9, 1, source["business"]),
             ("存存客户（客户级）", 6, 1, source["stock"]),
             ("存增客户（客户级）", 6, 1, source["grow"]),
-        ], work, "tracker", soffice)
+        ], work, "tracker", soffice, libreoffice_url)
         benchmark_values = load_workbook(benchmark_calc, data_only=True, read_only=True)
         tracker_values = load_workbook(tracker_calc, data_only=True, read_only=True)
 

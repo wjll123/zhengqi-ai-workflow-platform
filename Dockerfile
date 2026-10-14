@@ -40,8 +40,9 @@ COPY . .
 RUN rm -rf /app/offline_packages /app/vendor_debs
 
 # ---- 运行时环境 ----
-# 月报：LibreOffice 无头重算（app/workflows/monthly_4plus2.py 读 ZQC_SOFFICE）
-ENV ZQC_SOFFICE=/usr/lib/libreoffice/program/soffice
+# 月报：调用内网 winsun-libreoffice 远端转换服务重算（app/workflows/monthly_4plus2.py 读 LIBREOFFICE_URL）；
+#       不再依赖容器内本地 soffice，避免容器缺少 LibreOffice 运行时导致月报 502。
+ENV LIBREOFFICE_URL=http://172.18.101.171:48151
 ENV ZQC_DATA_DIR=/tmp/zqc-data
 ENV ZQC_PUBLIC_DEPLOYMENT=1
 ENV ZQC_HOST=0.0.0.0

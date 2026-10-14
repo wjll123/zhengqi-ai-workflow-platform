@@ -12,8 +12,9 @@ services:
         value: /tmp/zqc-data
       - key: ZQC_PUBLIC_DEPLOYMENT
         value: "1"
-      - key: ZQC_SOFFICE
-        value: /usr/lib/libreoffice/program/soffice
+      # 月报改走内网 LibreOffice 转换服务（公网 Render 连不上 172.18 内网，内网部署时填真实地址）
+      - key: LIBREOFFICE_URL
+        value: http://172.18.101.171:48151
 
       # ---- 访问鉴权（HTTP Basic）----
       # 默认账号 admin / 密码 bgsnhr（写在 app/core/config.py，开箱即用）。

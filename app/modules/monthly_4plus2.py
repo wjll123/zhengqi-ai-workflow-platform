@@ -329,7 +329,7 @@ def monthly_4plus2(batch: str = "", full: str = "", stock: str = "", grow: str =
             config = {"batch": batch, "sources": {k: str(v) for k, v in source_paths.items()},
                       "refs": {k: str(v) if v else None for k, v in refs.items()}, "positions": positions,
                       "outputDir": str(work_dir)}
-            detail = run_offline_monthly(config)
+            detail = run_offline_monthly(config, libreoffice_url=os.environ.get("LIBREOFFICE_URL"))
             files = detail["outputs"]
             candidate = {"benchmark": work_dir / files[0], "tracker": work_dir / files[1],
                          "notice": work_dir / files[2], "text": work_dir / files[3]}
