@@ -18,6 +18,12 @@ from .core.runner import recent_runs, registry, run_task, runs_for
 setup_logging()
 log = get_logger("web")
 
+# ============================================================
+# 任务可见性白名单（2026-10-14）：当前只开放已测试跑通的数据分析任务，
+# 其他任务先隐藏，避免用户误点未测试的功能。
+# ============================================================
+VISIBLE_TASK_KEYS: frozenset[str] = frozenset({"monthly_luozhe", "monthly_4plus2"})
+
 def _visible_files(d: Path) -> list[str]:
     """列出目录下可见的业务文件（排除临时文件与 .gitkeep）"""
     out: list[str] = []
@@ -71,9 +77,12 @@ def create_app() -> Flask:
     @app.get("/")
     def index():
         modules = {
-            module: [view_for(t) for t in tasks if t.key != "make_templates"]
+            module: [view_for(t) for t in tasks
+                     if t.key != "make_templates" and t.key in VISIBLE_TASK_KEYS]
             for module, tasks in registry.by_module().items()
         }
+        # 过滤后可能出现空模块组，顺手去掉空组更清爽
+        modules = {k: v for k, v in modules.items() if v}
         return render_template(
             "index.html",
             modules=modules,
@@ -212,7 +221,7 @@ def create_app() -> Flask:
     # ------------------------------------------------------------ API
     @app.get("/api/tasks")
     def api_tasks():
-        return jsonify([t.to_dict() for t in registry.all()])
+        return jsonify([t.to_dict() for t in registry.all() if t.key in VISIBLE_TASK_KEYS])
 
     @app.get("/api/sources/<key>")
     def api_sources(key: str):
@@ -230,9 +239,11 @@ def create_app() -> Flask:
 
     @app.get("/api/sources")
     def api_sources_all():
-        """全部任务的源数据就绪总览"""
+        """全部任务的源数据就绪总览（仅显示白名单任务）"""
         out = []
         for t in registry.all():
+            if t.key not in VISIBLE_TASK_KEYS:
+                continue
             if not t.required_sources:
                 continue
             pre = t.check_sources(INBOX_DIR)
