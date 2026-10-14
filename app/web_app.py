@@ -51,9 +51,12 @@ def create_app() -> Flask:
             hmac.compare_digest(auth.password or "", AUTH_PASS)
         if ok:
             return None
+        # 注意：WWW-Authenticate 是 HTTP 头，必须为 latin-1 可编码字符。
+        # realm 用 ASCII（"ZQC Platform"），中文说明放在 body 里，避免 UnicodeEncodeError。
         return Response(
-            "需要登录后才能访问", 401,
-            {"WWW-Authenticate": 'Basic realm="政企存量平台", charset="UTF-8"'},
+            "需要登录后才能访问".encode("utf-8"), 401,
+            {"WWW-Authenticate": 'Basic realm="ZQC Platform", charset="UTF-8"',
+             "Content-Type": "text/plain; charset=utf-8"},
         )
 
     # 加载所有模块（注册任务）
