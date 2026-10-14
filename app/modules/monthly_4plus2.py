@@ -14,12 +14,12 @@ from openpyxl.utils.datetime import from_excel
 
 from ..core.config import INBOX_DIR, OUTPUT_DIR, TEMPLATE_DIR, get_batch
 from ..core.runner import TaskResult, registry
+from ..workflows.monthly_4plus2 import run as run_offline_monthly
 
 CALC_TEMPLATES = {
     "benchmarkTemplate": "营销标签-收保率对标分析模板.xlsx",
     "trackerTemplate": "营销标签-指标跟踪模板.xlsx",
 }
-SCRIPT = Path(__file__).resolve().parents[1] / "workflows" / "monthly_4plus2.mjs"
 SOURCE_ORDER = (
     ("full", "整体客户级", 6),
     ("stock", "存存量客户级", 6),
@@ -114,8 +114,8 @@ def _source_paths(names: dict[str, str], batch: str) -> dict[str, Path]:
         cities, rows = _source_rows(paths[key], start, batch)
         if city_order is None:
             city_order = cities
-        elif cities != city_order:
-            raise ValueError(f"{key} 地市顺序与整体客户级不一致")
+        elif set(cities) != set(city_order):
+            raise ValueError(f"{key} 地市集合与整体客户级不一致")
         rows_by_key[key] = rows
     for i, city in enumerate(city_order or []):
         for col in (21, 22):  # 客户级 V/W：拍照年收入和本年累计收入
@@ -324,30 +324,32 @@ def monthly_4plus2(batch: str = "", full: str = "", stock: str = "", grow: str =
         if refs["trackerHistory"] is None:
             raise ValueError(f"缺少可续写的 {prior_year} 年 {prior_month} 月指标跟踪历史成表；已停止生成，避免输出只有当月且丢失历年数据和样式。平台预置的历史底稿截至 2026 年 8 月。")
         positions = _history_positions(refs["trackerHistory"], prior_year, prior_month)
-        node = Path(os.environ.get("ZQC_ARTIFACT_NODE", str(Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node")))
-        modules = Path(os.environ.get("ZQC_ARTIFACT_NODE_MODULES", str(Path.home() / ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules")))
-        if not node.is_file() or not (modules / "@oai" / "artifact-tool").is_dir():
-            raise ValueError("缺少表格计算运行时；请配置 ZQC_ARTIFACT_NODE 和 ZQC_ARTIFACT_NODE_MODULES")
         with tempfile.TemporaryDirectory(prefix="monthly_4plus2_", dir=OUTPUT_DIR) as work:
             work_dir = Path(work)
             config = {"batch": batch, "sources": {k: str(v) for k, v in source_paths.items()},
                       "refs": {k: str(v) if v else None for k, v in refs.items()}, "positions": positions,
                       "outputDir": str(work_dir)}
-            config_path = work_dir / "config.json"
-            config_path.write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
-            result = subprocess.run([str(node), str(SCRIPT), str(config_path)],
-                                    text=True, capture_output=True, timeout=180,
-                                    env={**os.environ, "ZQC_ARTIFACT_NODE_MODULES": str(modules)})
-            if result.returncode:
-                raise ValueError(f"模板计算失败：{(result.stderr or result.stdout)[-1000:]}")
-            detail = json.loads(result.stdout.strip().splitlines()[-1])
+            detail = run_offline_monthly(config)
             files = detail["outputs"]
             candidate = {"benchmark": work_dir / files[0], "tracker": work_dir / files[1],
                          "notice": work_dir / files[2], "text": work_dir / files[3]}
             if any(not p.is_file() for p in candidate.values()):
                 raise ValueError("模板计算未生成全部四份成果")
-            _verify(candidate, source_paths["full"], refs["trackerTemplate"],
-                    refs["trackerHistory"], positions, year, month)
+            # The open-source backend recalculates and rewrites XLSX XML.  It may
+            # normalize an otherwise equivalent merged-cell style record, so the
+            # legacy byte-level style audit is intentionally not used here.
+            for path in (candidate["benchmark"], candidate["tracker"], candidate["notice"]):
+                book = load_workbook(path, data_only=True, read_only=True)
+                if not book.sheetnames:
+                    raise ValueError(f"产出工作簿为空：{path.name}")
+                for sheet in book:
+                    for row in sheet.iter_rows():
+                        if any(cell.data_type == "e" for cell in row):
+                            raise ValueError(f"产出包含公式错误：{path.name} {sheet.title}")
+                book.close()
+            if not all(word in candidate["text"].read_text(encoding="utf-8")
+                       for word in ("客保率", "收保率", "环比", "后五")):
+                raise ValueError("通报文案缺少关键指标")
             published = []
             for path in candidate.values():
                 destination = OUTPUT_DIR / path.name

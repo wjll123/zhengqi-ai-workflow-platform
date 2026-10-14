@@ -1,8 +1,9 @@
 # 政企存量平台 · 本地 / 自托管 Docker Compose 编排
-# 与 Render（render.yaml, runtime: docker）共用同一份 Dockerfile（全离线依赖版）。
+# 与 render.yaml 共用同一份 Dockerfile（全离线依赖版：系统 deb + Python whl 均随仓库提供）。
+# 月报已改为 LibreOffice 无头重算，不再依赖 Node / 私有 artifact-tool。
 #
 # 用法：
-#   1) 可直接 build（离线依赖已随仓库提供，无需任何源/代理）：
+#   1) 直接 build（离线依赖已随仓库提供，无需任何源/代理）：
 #        docker compose build
 #   2) 起服务：
 #        docker compose up -d
@@ -12,21 +13,12 @@
 #        ZQC_AUTH_USER=admin
 #        ZQC_AUTH_PASS=<你的密码>
 #      两者都设才生效；只设一个或都不设 = 不鉴权（本地开发方便）。
-#
-# 可选：让月报在容器内可算（artifact-tool 私有包走私有 Git 仓库）：
-#        ARTIFACT_GIT_URL=https://<你的私有git>/artifact-tool-private.git
-#        ARTIFACT_GIT_TOKEN=<只读 PAT>
-#      不设则月报运行时降级，其余任务正常。
 
 services:
   zhengqi:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # artifact-tool 私有仓库（月报用）；未设置则传空，月报降级，其余任务不受影响
-        ARTIFACT_GIT_URL: ${ARTIFACT_GIT_URL:-}
-        ARTIFACT_GIT_TOKEN: ${ARTIFACT_GIT_TOKEN:-}
     image: zhengqi-ai-workflow:latest
     container_name: zhengqi-ai-workflow
     ports:
@@ -36,8 +28,7 @@ services:
       ZQC_HOST: "0.0.0.0"
       ZQC_DATA_DIR: "/tmp/zqc-data"
       ZQC_PUBLIC_DEPLOYMENT: "1"
-      ZQC_ARTIFACT_NODE: "/usr/local/bin/node"
-      ZQC_ARTIFACT_NODE_MODULES: "/opt/artifact/node_modules"
+      ZQC_SOFFICE: "/usr/lib/libreoffice/program/soffice"
       # 访问鉴权：两者都设才启用（留空 = 不鉴权）
       ZQC_AUTH_USER: ${ZQC_AUTH_USER:-}
       ZQC_AUTH_PASS: ${ZQC_AUTH_PASS:-}

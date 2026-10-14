@@ -12,6 +12,8 @@ services:
         value: /tmp/zqc-data
       - key: ZQC_PUBLIC_DEPLOYMENT
         value: "1"
+      - key: ZQC_SOFFICE
+        value: /usr/lib/libreoffice/program/soffice
 
       # ---- 访问鉴权（HTTP Basic）----
       # 两者都设置才启用鉴权；留空 = 不鉴权（任何人可访问）。
@@ -19,12 +21,4 @@ services:
       - key: ZQC_AUTH_USER
         sync: false
       - key: ZQC_AUTH_PASS
-        sync: false
-
-      # ---- 月报 artifact-tool（可选）----
-      # 月报依赖 OpenAI 私有包 @oai/artifact-tool，需你把它推到一个私有 Git 仓库后在此配置。
-      # 不配置则月报运行时降级，其余任务（落责等）正常。
-      - key: ARTIFACT_GIT_URL
-        sync: false
-      - key: ARTIFACT_GIT_TOKEN
         sync: false

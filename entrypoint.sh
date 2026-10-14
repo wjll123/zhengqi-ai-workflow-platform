@@ -15,4 +15,13 @@ if [ -d /app/data/seed ]; then
   cp -n /app/data/seed/* /tmp/zqc-data/outputs/ 2>/dev/null || true
 fi
 
+# LibreOffice 无头运行准备：提供可写的 HOME 与运行时目录，避免首次运行因权限/目录缺失失败。
+export HOME="${HOME:-/tmp}"
+mkdir -p /tmp/.config /tmp/.cache 2>/dev/null || true
+if [ -x /usr/lib/libreoffice/program/soffice ]; then
+  echo "[entrypoint] LibreOffice: $(/usr/lib/libreoffice/program/soffice --version 2>/dev/null | head -1 || echo 'version check skipped')"
+else
+  echo "[entrypoint] WARN: 未找到 /usr/lib/libreoffice/program/soffice，月报将不可用（其余任务正常）"
+fi
+
 exec gunicorn app.web_app:app --bind 0.0.0.0:${PORT:-10000} --workers 1 --threads 4 --timeout 300
