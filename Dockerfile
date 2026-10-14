@@ -46,9 +46,10 @@ ENV ZQC_DATA_DIR=/tmp/zqc-data
 ENV ZQC_PUBLIC_DEPLOYMENT=1
 ENV ZQC_HOST=0.0.0.0
 
-# 访问鉴权（HTTP Basic）默认空值 = 不鉴权；运行时用 -e / compose environment 注入即可启用：
-#   docker run -e ZQC_AUTH_USER=admin -e ZQC_AUTH_PASS=<密码> ...
-ENV ZQC_AUTH_USER=""
-ENV ZQC_AUTH_PASS=""
+# 访问鉴权（HTTP Basic）：默认 admin/bgsnhr（写在 app/core/config.py，开箱即用）。
+# 如需改账号/密码，运行时注入环境变量覆盖即可：
+#   docker run -e ZQC_AUTH_USER=xxx -e ZQC_AUTH_PASS=yyy ...
+# 如需完全关闭鉴权：显式传空，例如 -e ZQC_AUTH_PASS=""
+# 注意：此处勿写 ENV ZQC_AUTH_*=""，否则会把代码里的默认值覆盖为空导致鉴权失效。
 
 ENTRYPOINT ["/app/entrypoint.sh"]

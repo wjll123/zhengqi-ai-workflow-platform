@@ -9,10 +9,10 @@
 #        docker compose up -d
 #   3) 浏览器打开 http://localhost:8848
 #
-# 可选：开启访问鉴权（HTTP Basic）。在 shell 或 .env 中设置：
-#        ZQC_AUTH_USER=admin
-#        ZQC_AUTH_PASS=<你的密码>
-#      两者都设才生效；只设一个或都不设 = 不鉴权（本地开发方便）。
+# 访问鉴权（HTTP Basic）：默认账号 admin / 密码 bgsnhr（内置，开箱即用）。
+# 如需改账号密码：在 shell 或 .env 中设 ZQC_AUTH_USER / ZQC_AUTH_PASS，并取消下面两行注释。
+# 如需关闭鉴权（免登录）：取消下面两行注释并把值留空，例如 ZQC_AUTH_PASS: ""。
+#   ⚠️ 不要直接保留 `${ZQC_AUTH_PASS:-}` 而未设变量——那会传空值覆盖默认密码，导致鉴权失效。
 
 services:
   zhengqi:
@@ -29,9 +29,10 @@ services:
       ZQC_DATA_DIR: "/tmp/zqc-data"
       ZQC_PUBLIC_DEPLOYMENT: "1"
       ZQC_SOFFICE: "/usr/lib/libreoffice/program/soffice"
-      # 访问鉴权：两者都设才启用（留空 = 不鉴权）
-      ZQC_AUTH_USER: ${ZQC_AUTH_USER:-}
-      ZQC_AUTH_PASS: ${ZQC_AUTH_PASS:-}
+      # 访问鉴权（默认走代码内置 admin/bgsnhr，无需在此设置）：
+      # 如需自定义/关闭，取消注释并填值：
+      # ZQC_AUTH_USER: "admin"
+      # ZQC_AUTH_PASS: "bgsnhr"
     volumes:
       # 宿主机挂载，避免容器重启/重建后 inbox、outputs、state（调度台账）丢失。
       # entrypoint 用 cp -n 铺设模板与底稿，首次为空目录时自动铺入，之后不覆盖用户数据。

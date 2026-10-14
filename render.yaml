@@ -16,8 +16,9 @@ services:
         value: /usr/lib/libreoffice/program/soffice
 
       # ---- 访问鉴权（HTTP Basic）----
-      # 两者都设置才启用鉴权；留空 = 不鉴权（任何人可访问）。
-      # 请在此处或 Render 后台 Environment 中设置，密码务必设为 secret。
+      # 默认账号 admin / 密码 bgsnhr（写在 app/core/config.py，开箱即用）。
+      # 下面两项为可选覆盖：未在 Render 后台设置时不会注入，使用代码默认值。
+      # 如需改密码，请在 Render 后台 Environment 设置（ZQC_AUTH_PASS 建议标为 secret）。
       - key: ZQC_AUTH_USER
         sync: false
       - key: ZQC_AUTH_PASS
