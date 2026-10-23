@@ -24,11 +24,10 @@ HOST = os.environ.get("ZQC_HOST", "127.0.0.1")
 PORT = int(os.environ.get("ZQC_PORT", "8848"))
 DEBUG = os.environ.get("ZQC_DEBUG", "0") == "1"
 
-# 访问鉴权（HTTP Basic）
-# 默认账号 admin/bgsnhr（内置，开箱即用）；可用环境变量 ZQC_AUTH_USER / ZQC_AUTH_PASS 覆盖。
-# 两者任一被显式置空则鉴权关闭（如 ZQC_AUTH_PASS=""）；本地开发如需免登录，置空即可。
-AUTH_USER = os.environ.get("ZQC_AUTH_USER", "admin").strip()
-AUTH_PASS = os.environ.get("ZQC_AUTH_PASS", "bgsnhr")
+# 访问鉴权（HTTP Basic）。默认不内置账号，避免把共享密码发布到 Git。
+# 上线时同时设置 ZQC_AUTH_USER 和 ZQC_AUTH_PASS；两者都留空表示本机开发模式。
+AUTH_USER = os.environ.get("ZQC_AUTH_USER", "").strip()
+AUTH_PASS = os.environ.get("ZQC_AUTH_PASS", "")
 AUTH_ENABLED = bool(AUTH_USER and AUTH_PASS)
 # 放行路径（探针等不可被鉴权拦截）
 AUTH_WHITELIST = {"/healthz"}

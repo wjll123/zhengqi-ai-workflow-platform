@@ -78,13 +78,13 @@ MIN_FREE_MB = 500          # 磁盘剩余告警阈值（MB）
 def check_python() -> Check:
     v = sys.version_info
     ver = f"{v.major}.{v.minor}.{v.micro}"
-    ok = (v.major, v.minor) >= (3, 10)
+    ok = (v.major, v.minor) >= (3, 9)
     return Check(
         name="运行环境",
         ok=ok,
         level="ok" if ok else "error",
         detail=f"Python {ver}",
-        advice="" if ok else "需要 Python 3.10 及以上版本",
+        advice="" if ok else "需要 Python 3.9 及以上版本",
     )
 
 

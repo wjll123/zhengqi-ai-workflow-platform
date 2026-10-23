@@ -1,31 +1,7 @@
 .git
+.gitignore
 .venv
+data
 __pycache__
 *.pyc
-*.pyo
-node_modules
-**/.DS_Store
-*.log
-
-# 运行时数据目录不进构建上下文（公开部署用 /tmp/zqc-data，由 entrypoint 铺设）
-data/inbox
-data/outputs
-data/logs
-data/state
-data/trash
-data/config
-
-# 计算模板和预置历史底稿是镜像启动所需的部署资产，必须进入构建上下文；
-# 仅排除客户源数据和运行时生成的结果。
-!data/templates/
-!data/templates/**
-!data/seed/
-!data/seed/**
-
-# 离线依赖包（pip whl + Node tarball）是镜像构建所需资产，必须进入构建上下文。
-!offline_packages/
-!offline_packages/**
-
-# 系统依赖 deb 包（bookworm/amd64 全量）也是构建资产，必须进入构建上下文。
-!vendor_debs/
-!vendor_debs/**
+docs/test-fixtures

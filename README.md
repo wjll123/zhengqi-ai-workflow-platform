@@ -36,7 +36,7 @@ python3 -m venv .venv
 
 公开部署使用临时工作目录（`ZQC_DATA_DIR=/tmp/zqc-data`），重启或实例回收后上传的文件会消失。公开链接上的文件列表和计算接口是共享的，不能上传客户身份证号、收入明细等敏感数据；需要多人正式使用时，应在 Render 前增加登录认证，并为每个用户分配独立工作目录。
 
-月报任务 `monthly_4plus2` 还需要可用的 `@oai/artifact-tool` 计算运行时。该运行时不在公开 npm 仓库，不能随仓库分发；本地 Codex 工作区可直接使用。公开 Render 服务可运行其余 Python 任务；若要在线运行月报，需要由部署方提供经授权的计算运行时，或改用 LibreOffice/openpyxl 计算后端。
+月报任务 `monthly_4plus2` 使用 LibreOffice headless + openpyxl 进行离线公式计算，不依赖 `@oai/artifact-tool` 或网络。离线交付包会同时带上 Python wheel 缓存和 LibreOffice 运行时；安装后可在无网络环境运行。公开 Render 服务仍可运行其余 Python 任务；在线运行月报需要部署方提供 LibreOffice 运行时。
 
 本地启动：
 
@@ -45,6 +45,29 @@ python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 ZQC_HOST=127.0.0.1 ./.venv/bin/python3 -m app.web_app
 ```
+
+### Git 发布与离线交付
+
+Git 仓库只包含程序代码、测试和文档。客户源表、生成结果、日志、运行状态、虚拟环境和本机运行时均被排除，不应提交到仓库。
+
+```bash
+git status --short
+git add .
+git commit -m "release: offline-ready platform"
+git push origin main
+```
+
+Docker / Render 使用 `Dockerfile` 或 `render.yaml` 启动。上线时必须设置 `ZQC_AUTH_USER` 和 `ZQC_AUTH_PASS`，并为 `ZQC_DATA_DIR` 配置持久化磁盘。企查查查询需要平台与已登录浏览器运行在同一台 Mac：优先支持 Chrome/Edge 调试模式，也可使用 Safari。云端服务不能接管用户电脑上的浏览器。
+
+Chrome 调试模式：在 Mac 终端执行 `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir="$HOME/.zqc-chrome-debug"`。Edge 将程序路径改为 `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge`、端口改为 `9223`、配置目录改为 `$HOME/.zqc-edge-debug`。在新打开的调试窗口登录企查查、打开 `https://www.qcc.com/`，回到平台点击“检测浏览器连接”。调试配置目录独立于日常浏览器，可能需要重新登录；日常窗口无需关闭。
+
+构建 macOS 离线包（需要本机已有 `runtime/LibreOfficeDev.app` 和 `政企ai工作流平台/wheels/`）：
+
+```bash
+./scripts/build_offline_package.sh
+```
+
+生成的 ZIP 不含客户数据；目标 Mac 解压后运行 `./install_offline.sh`，再运行 `./run_offline.sh`。安装过程使用包内 wheel，不访问网络。
 
 GitHub 发布前请确认没有把 `data/`、客户文件或本机配置加入暂存区：
 
@@ -118,7 +141,7 @@ git check-ignore -v data/inbox/任意文件.xlsx
 
 进入「数据分析 → 政企存量 4+2 收客保月报」，设置账期（如 `202609`），选择同账期四份 CDAP 原样导出，以及《收保率对标分析表_模板》和《指标跟踪_模板表》两份计算模板。平台已预置两份计算模板，也可上传新版。指标跟踪成表从平台保存的上月完整历史表续写，保留前几年及前几个月的数据和格式；平台预置的历史底稿截至 2026 年 8 月，无需手动提供。缺少连续月份历史底稿时任务报错，不生成只有当月的简易表。五项地市环比从上月同地市数据计算。收保率对标表和通报表按当前源数据及模板生成，不要求同名上月成表。成果为三张工作簿和一份通报文案，可在 `data/outputs/` 下载。任务会核对全省及 21 地市、纯净收入公式、五项环比和通报表与指标跟踪表的数据一致性。
 
-本任务使用工作区提供的 Node.js 和 `@oai/artifact-tool` 计算模板公式。若运行环境不同，设置 `ZQC_ARTIFACT_NODE` 和 `ZQC_ARTIFACT_NODE_MODULES` 指向对应的 Node 可执行文件及其 `node_modules`。按地市纯净收入的剔除项沿用计算模板中现有数值，正式使用前须核对该数值是否属于本账期。
+本任务用 LibreOffice 重算两张计算模板，再用 openpyxl 续写历史成果。若环境中的 `soffice` 不在 PATH，可设置 `ZQC_SOFFICE` 指向可执行文件。按地市纯净收入的剔除项沿用计算模板中现有数值，正式使用前须核对该数值是否属于本账期。
 
 ### 系统导出 · 直接加工（9 个）
 
@@ -221,8 +244,7 @@ python-pptx 1.0.2  PPT
 | `ZQC_PORT` | 8848 | 端口 |
 | `ZQC_LOG_LEVEL` | INFO | 日志级别 |
 | `ZQC_ENABLE_RPA` | 0 | 设为 1 启用 CDAP 自动导出 |
-| `ZQC_ARTIFACT_NODE` | 工作区 Node 路径 | 4+2 月报的模板计算运行时 |
-| `ZQC_ARTIFACT_NODE_MODULES` | 工作区 node_modules 路径 | 包含 `@oai/artifact-tool` |
+| `ZQC_SOFFICE` | LibreOffice `soffice` 路径 | 4+2 月报的模板计算运行时 |
 
 ---
 

@@ -78,13 +78,13 @@
         </div>
       </details>
       <div class="foot">
-        {% if t.key in ['monthly_report_ppt_tables', 'monthly_4plus2', 'monthly_luozhe_audit'] %}
+        {% if t.key in ['monthly_report_ppt_tables', 'monthly_4plus2', 'monthly_luozhe_audit', 'qcc_company'] %}
         <a href="/task/{{ t.key }}" class="btn sm">执行</a>
         {% else %}
         <button class="btn sm" onclick="runTask('{{ t.key }}', this)">执行</button>
         {% endif %}
         <button class="btn ghost sm" data-guide="{{ t.key }}">数据说明</button>
-        {% if t.key not in ['monthly_report_ppt_tables', 'monthly_4plus2', 'monthly_luozhe_audit'] %}<a href="/task/{{ t.key }}" class="btn ghost sm">详情</a>{% endif %}
+        {% if t.key not in ['monthly_report_ppt_tables', 'monthly_4plus2', 'monthly_luozhe_audit', 'qcc_company'] %}<a href="/task/{{ t.key }}" class="btn ghost sm">详情</a>{% endif %}
       </div>
       <div id="guide-{{ t.key }}"></div>
     </div>

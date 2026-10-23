@@ -22,7 +22,7 @@ log = get_logger("web")
 # 任务可见性白名单（2026-10-14）：当前只开放已测试跑通的数据分析任务，
 # 其他任务先隐藏，避免用户误点未测试的功能。
 # ============================================================
-VISIBLE_TASK_KEYS: frozenset[str] = frozenset({"monthly_luozhe", "monthly_4plus2"})
+VISIBLE_TASK_KEYS: frozenset[str] = frozenset({"monthly_luozhe", "monthly_4plus2", "qcc_company"})
 
 def _visible_files(d: Path) -> list[str]:
     """列出目录下可见的业务文件（排除临时文件与 .gitkeep）"""
@@ -72,6 +72,8 @@ def create_app() -> Flask:
     # 数据预览蓝图
     from .preview import bp as preview_bp
     app.register_blueprint(preview_bp)
+    from .qcc.routes import bp as qcc_bp
+    app.register_blueprint(qcc_bp)
 
     # ------------------------------------------------------------ 页面
     @app.get("/")

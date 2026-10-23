@@ -24,6 +24,7 @@ def load_all() -> None:
         material_output,
         material_monthly_ppt,
         monthly_4plus2,
+        qcc_company,
     )
 
     # RPA 模块：默认不加载，设 ZQC_ENABLE_RPA=1 可启用

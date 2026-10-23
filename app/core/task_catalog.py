@@ -3,6 +3,10 @@ from __future__ import annotations
 
 
 CATALOG: dict[str, dict] = {
+    "qcc_company": {
+        "title": "企查查 · 企业批量查询",
+        "needs": [("公司名称表格", "上传含“公司名称”列的 xlsx、xls 或 csv；在本机默认浏览器打开企查查并登录后运行")],
+    },
     "weekly_841": {
         "title": "接单情况周报 · 营销活动管控表",
         "needs": [("营销活动管控明细", "市、区县、营服、活动创建时间、工单数、转化量、转化率、派单与处理状态、走访及商机指标")],

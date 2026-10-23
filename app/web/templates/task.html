@@ -8,7 +8,9 @@
   &nbsp;{{ task.description }}
 </div>
 
-{% if task.key == 'monthly_4plus2' %}
+{% if task.key == 'qcc_company' %}
+{% include 'qcc_workspace.html' %}
+{% elif task.key == 'monthly_4plus2' %}
 <div class="card" style="cursor:default;max-width:860px;display:block;">
   <div style="font-weight:700;margin-bottom:12px;">选择本账期四份源数据和两份计算模板</div>
   <label for="monthlyBatch">账期（YYYYMM）</label>
@@ -226,6 +228,7 @@ refreshPptChoices();
 
 <div id="result"></div>
 
+{% if task.key != 'qcc_company' %}
 <div class="grp" style="margin-top:34px;">
   <div class="grp-t">最近运行记录</div>
   {% if histories %}
@@ -250,4 +253,5 @@ refreshPptChoices();
   <div class="empty">还没有运行记录</div>
   {% endif %}
 </div>
+{% endif %}
 {% endblock %}

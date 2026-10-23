@@ -1,0 +1,74 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='qcc-workspace.css') }}">
+<div class="qcc-layout">
+  <section class="qcc-panel" aria-labelledby="qccSetupTitle">
+    <div class="qcc-heading"><h2 id="qccSetupTitle">建立查询批次</h2><span class="tag">每份名单最多 100 家</span></div>
+    <p class="qcc-note">先在运行平台的 Mac 上启动并登录浏览器。Chrome/Edge 需使用调试模式，Safari 可直接使用。逐家保存详情页披露的股东、分期出资和主要人员字段，并校验记录总数。</p>
+    <label for="qccBrowser">查询浏览器</label>
+    <select id="qccBrowser"><option value="chrome">Chrome（调试模式）</option><option value="edge">Edge（调试模式）</option><option value="safari">Safari</option></select>
+    <p id="qccBrowserHelp" class="qcc-note"></p>
+    <code id="qccBrowserCommand" class="qcc-browser-command"></code>
+    <div class="qcc-actions"><button id="qccBrowserCheck" class="btn ghost sm" type="button">检测浏览器连接</button><span id="qccBrowserState" class="qcc-note" role="status"></span></div>
+    <label for="qccSource">公司名称名单</label>
+    <select id="qccSource"><option value="">请选择名单</option></select>
+    <div class="qcc-actions">
+      <label class="btn ghost sm" for="qccUpload">上传名单</label>
+      <input id="qccUpload" type="file" accept=".xlsx,.xls,.csv" hidden>
+      <span class="qcc-note">支持 Excel、CSV；包含“公司名称”列。</span>
+    </div>
+    <div id="qccCount" class="qcc-count" role="status">选择名单后显示实际待查数量。</div>
+    <div class="qcc-grid">
+      <label>每轮最多查询<input id="qccLimit" type="number" min="1" max="100" step="1" value="100">家</label>
+      <label>相邻企业查询间隔<input id="qccDelay" type="number" min="60" max="600" step="1" value="60">秒</label>
+    </div>
+    <details class="qcc-options">
+      <summary>续查旧结果与同名企业核对</summary>
+      <label for="qccPrevious">已有的查询结果</label>
+      <select id="qccPrevious"><option value="">本次重新查询</option></select>
+      <p class="qcc-note">保留已补齐的成功项；旧版基础字段会继续补齐。两份名单需一致。</p>
+      <label for="qccIdentity">统一社会信用代码来源（可选）</label>
+      <select id="qccIdentity"><option value="">不使用辅助表</option></select>
+      <p class="qcc-note">选择含企业名称、统一社会信用代码的原始 xlsx 表，帮助区分同名企业。</p>
+    </details>
+    <p id="qccActiveNotice" class="qcc-note" role="status" aria-live="polite" hidden></p>
+    <button class="btn full" type="button" id="qccRun" disabled>开始批量查询</button>
+    <p id="qccMsg" class="qcc-note" role="status" aria-live="polite"></p>
+  </section>
+  <aside class="qcc-panel qcc-guide">
+    <h2>查询与续查</h2>
+    <ol>
+      <li><strong>确认名单</strong><p>核对去重后的数量。增量清单只读取新增企业。</p></li>
+      <li><strong>逐家保存</strong><p>查询在后台进行。刷新本页后仍能查看进度，已完成资料自动保存。</p></li>
+      <li><strong>验证后继续</strong><p>出现登录或验证时保留当前浏览器页面。手动处理后，点击“继续未完成项”。</p></li>
+    </ol>
+    <div class="qcc-official">
+      <strong>使用 SVIP 导出权益</strong>
+      <p>也可在企查查使用官方批量查询。字段与额度以账号页面为准，开放平台 API 权益需单独核实。</p>
+      <a href="https://www.qcc.com/web/project/batchSearch" target="_blank" rel="noopener noreferrer">打开官方批量查询 ↗</a>
+    </div>
+    <p class="qcc-note">当前测试配置：相邻企业至少间隔 60 秒，浏览器调用至少间隔 3 秒。遇验证立即暂停；续查会遵守冷却时间。不能保证免验证，请保持本机平台运行。</p>
+  </aside>
+</div>
+<section id="qccProgress" class="qcc-panel qcc-progress" hidden aria-labelledby="qccProgressTitle">
+  <div class="qcc-heading"><h2 id="qccProgressTitle">查询进度</h2><span id="qccState" class="tag"></span></div>
+  <label for="qccHistory">查询批次</label>
+  <select id="qccHistory"></select>
+  <div class="qcc-metrics">
+    <div><strong id="qccTotal">0</strong><span>名单企业</span></div>
+    <div><strong id="qccSuccess">0</strong><span>页面字段已补齐</span></div>
+    <div><strong id="qccFailed">0</strong><span>查询失败</span></div>
+    <div><strong id="qccPending">0</strong><span>尚未完成</span></div>
+  </div>
+  <progress id="qccBar" max="100" value="0" aria-label="企业查询进度"></progress>
+  <p id="qccJobMessage" role="status" aria-live="polite"></p>
+  <p id="qccScope" class="qcc-note"></p>
+  <div class="qcc-actions">
+    <button id="qccPause" class="btn ghost" type="button">暂停查询</button>
+    <button id="qccResume" class="btn" type="button" hidden>继续未完成项</button>
+    <a id="qccDownload" class="btn ghost" href="#">下载当前结果 Excel</a>
+  </div>
+  <div class="qcc-table-wrap"><table>
+    <thead><tr><th scope="col">企业名称</th><th scope="col">状态</th><th scope="col">查询情况</th></tr></thead>
+    <tbody id="qccRows"></tbody>
+  </table></div>
+</section>
+<script src="{{ url_for('static', filename='qcc-workspace.js') }}" defer></script>
