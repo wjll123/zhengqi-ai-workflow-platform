@@ -7,7 +7,10 @@
     const response = await fetch(url, options);
     if (response.status === 401) throw new Error('平台登录已失效，请刷新页面登录。');
     const contentType = response.headers.get('content-type') || '';
-    const data = contentType.includes('application/json') ? await response.json() : {ok:false, message:await response.text()};
+    const data = contentType.includes('application/json') ? await response.json()
+      : {ok:false, message:response.status === 413
+        ? '文件超过服务器上传上限，请压缩文件或联系管理员调整限制。'
+        : '服务器返回 HTTP ' + response.status};
     if (!response.ok || data.ok === false) throw new Error(data.message || data.error || '请求失败');
     return data;
   }

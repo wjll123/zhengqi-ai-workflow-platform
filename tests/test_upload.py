@@ -29,6 +29,18 @@ class UploadApiTests(unittest.TestCase):
         self.assertFalse(response.json['ok'])
         self.assertIn('不支持的格式', response.json['skipped'][0])
 
+    def test_upload_reports_size_limit_as_json(self):
+        app = create_app()
+        app.config.update(TESTING=True, MAX_CONTENT_LENGTH=100)
+        with app.test_client() as client:
+            response = client.post('/api/upload', data={
+                'files': (io.BytesIO(b'x' * 101), 'large.csv')
+            }, content_type='multipart/form-data')
+        self.assertEqual(response.status_code, 413)
+        self.assertTrue(response.is_json)
+        self.assertFalse(response.json['ok'])
+        self.assertIn('文件过大', response.json['error'])
+
 
 if __name__ == '__main__':
     unittest.main()

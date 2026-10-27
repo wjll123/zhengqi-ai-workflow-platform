@@ -42,6 +42,7 @@ def _visible_files(d: Path) -> list[str]:
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
     app.config["JSON_AS_ASCII"] = False
+    app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024
 
     @app.errorhandler(RequestEntityTooLarge)
     def _upload_too_large(exc):

@@ -567,7 +567,10 @@ async function doModalUpload(fileList, msgEl){
   try{
     const response = await fetch('/api/upload', {method:'POST', body:fd});
     const contentType = response.headers.get('content-type') || '';
-    const d = contentType.includes('application/json') ? await response.json() : {ok:false, error:await response.text()};
+    const d = contentType.includes('application/json') ? await response.json()
+      : {ok:false, error:response.status === 413
+        ? '文件超过服务器上传上限，请压缩文件或联系管理员调整限制。'
+        : '服务器返回 HTTP ' + response.status};
     if(!response.ok && !d.error) d.error = '服务器返回 HTTP ' + response.status;
     msgEl.innerHTML = d.ok
       ? '<span style="color:var(--green);">✓ ' + escapeHtml(d.message) + '</span>' +
