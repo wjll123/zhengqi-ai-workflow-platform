@@ -47,7 +47,7 @@ def create_app() -> Flask:
     def _upload_too_large(exc):
         if request.path == "/api/upload":
             return jsonify(ok=False, error="上传文件过大，请压缩文件或拆分后重试。"), 413
-        return exc
+        return exc.get_response()
 
     # ------------------------------------------------------------ 访问鉴权
     # HTTP Basic 全站鉴权：仅当配置了 ZQC_AUTH_USER + ZQC_AUTH_PASS 时启用。
