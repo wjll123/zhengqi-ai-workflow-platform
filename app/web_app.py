@@ -5,6 +5,7 @@ import hmac
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, render_template, request
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from .core.config import (
     HOST, PORT, DEBUG, INBOX_DIR, OUTPUT_DIR, TEMPLATE_DIR, REFERENCE_DIR, LOG_FILE, TRASH_DIR,
@@ -41,6 +42,12 @@ def _visible_files(d: Path) -> list[str]:
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="web/templates", static_folder="web/static")
     app.config["JSON_AS_ASCII"] = False
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def _upload_too_large(exc):
+        if request.path == "/api/upload":
+            return jsonify(ok=False, error="上传文件过大，请压缩文件或拆分后重试。"), 413
+        return exc
 
     # ------------------------------------------------------------ 访问鉴权
     # HTTP Basic 全站鉴权：仅当配置了 ZQC_AUTH_USER + ZQC_AUTH_PASS 时启用。
@@ -346,7 +353,13 @@ def create_app() -> Flask:
                         target = cand
                         break
 
-            f.save(str(target))
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                f.save(str(target))
+            except OSError as exc:
+                log.exception("保存上传文件失败: %s", target)
+                skipped.append(f"{raw}（保存失败：{exc.strerror or '文件系统错误'}）")
+                continue
             saved.append(target.name)
             log.info("上传数据源: %s", target.name)
 

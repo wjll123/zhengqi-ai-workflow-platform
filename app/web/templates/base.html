@@ -565,12 +565,15 @@ async function doModalUpload(fileList, msgEl){
   for(const f of fileList) fd.append('files', f);
   msgEl.innerHTML = '<span style="color:var(--ink3);">上传中…</span>';
   try{
-    const d = await (await fetch('/api/upload', {method:'POST', body:fd})).json();
+    const response = await fetch('/api/upload', {method:'POST', body:fd});
+    const contentType = response.headers.get('content-type') || '';
+    const d = contentType.includes('application/json') ? await response.json() : {ok:false, error:await response.text()};
+    if(!response.ok && !d.error) d.error = '服务器返回 HTTP ' + response.status;
     msgEl.innerHTML = d.ok
       ? '<span style="color:var(--green);">✓ ' + escapeHtml(d.message) + '</span>' +
         (d.saved||[]).map(x=>'<br>　· '+escapeHtml(x)).join('') +
         '<br><span style="color:var(--ink3);font-size:12px;">文件已上传，请点下方「我已处理，重试」校验并执行</span>'
-      : '<span style="color:var(--red);">✕ ' + escapeHtml(d.error||'上传失败') + '</span>';
+      : '<span style="color:var(--red);">✕ ' + escapeHtml(d.error||('上传失败（HTTP ' + response.status + '）')) + '</span>';
     if(typeof loadDirs === 'function') loadDirs();
     if(d.ok){
       // 上传成功后刷新源状态（任务卡徽标 + 待源面板）
@@ -578,7 +581,7 @@ async function doModalUpload(fileList, msgEl){
       if(typeof loadNeedPanel === 'function') loadNeedPanel();
     }
   }catch(e){
-    msgEl.innerHTML = '<span style="color:var(--red);">✕ 上传失败</span>';
+    msgEl.innerHTML = '<span style="color:var(--red);">✕ 上传失败：' + escapeHtml(e.message || '网络连接失败') + '</span>';
   }
 }
 

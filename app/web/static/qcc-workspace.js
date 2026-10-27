@@ -6,7 +6,8 @@
   async function api(url, options = {}) {
     const response = await fetch(url, options);
     if (response.status === 401) throw new Error('平台登录已失效，请刷新页面登录。');
-    const data = await response.json();
+    const contentType = response.headers.get('content-type') || '';
+    const data = contentType.includes('application/json') ? await response.json() : {ok:false, message:await response.text()};
     if (!response.ok || data.ok === false) throw new Error(data.message || data.error || '请求失败');
     return data;
   }
