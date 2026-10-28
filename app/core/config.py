@@ -32,6 +32,10 @@ AUTH_ENABLED = bool(AUTH_USER and AUTH_PASS)
 # 放行路径（探针等不可被鉴权拦截）
 AUTH_WHITELIST = {"/healthz"}
 
+# Shared secret used by desktop workers polling the cloud queue.
+# Production should set this to a long random value.
+WORKER_TOKEN = os.environ.get("ZQC_WORKER_TOKEN", "").strip()
+
 # 日志
 LOG_LEVEL = os.environ.get("ZQC_LOG_LEVEL", "INFO")
 LOG_FILE = LOG_DIR / "platform.log"

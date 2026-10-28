@@ -2,10 +2,13 @@
 <div class="qcc-layout">
   <section class="qcc-panel" aria-labelledby="qccSetupTitle">
     <div class="qcc-heading"><h2 id="qccSetupTitle">建立查询批次</h2><span class="tag">每份名单最多 100 家</span></div>
-    <p class="qcc-note">先在运行平台的 Mac 上启动并登录浏览器。Chrome/Edge 需使用调试模式，Safari 可直接使用。逐家保存详情页披露的股东、分期出资和主要人员字段，并校验记录总数。</p>
+    <p class="qcc-note">默认由“我的电脑”上的桌面助手执行。请在执行电脑登录企查查；Chrome/Edge 需使用调试模式，Safari 可直接使用。逐家保存详情页披露的股东、分期出资和主要人员字段，并校验记录总数。</p>
     <label for="qccBrowser">查询浏览器</label>
     <select id="qccBrowser"><option value="chrome">Chrome（调试模式）</option><option value="edge">Edge（调试模式）</option><option value="safari">Safari</option></select>
     <p id="qccBrowserHelp" class="qcc-note"></p>
+    <label for="qccExecution">运行位置</label>
+    <select id="qccExecution"><option value="desktop">我的电脑（桌面助手执行）</option><option value="local">当前运行平台的浏览器</option></select>
+    <p class="qcc-note">选择“我的电脑”后，任务进入云端队列，由这台电脑上的桌面助手使用本机已登录的企查查浏览器执行。</p>
     <code id="qccBrowserCommand" class="qcc-browser-command"></code>
     <div class="qcc-actions"><button id="qccBrowserCheck" class="btn ghost sm" type="button">检测浏览器连接</button><span id="qccBrowserState" class="qcc-note" role="status"></span></div>
     <label for="qccSource">公司名称名单</label>

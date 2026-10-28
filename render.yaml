@@ -17,3 +17,5 @@ services:
         sync: false
       - key: ZQC_AUTH_PASS
         sync: false
+      - key: ZQC_WORKER_TOKEN
+        sync: false

@@ -111,6 +111,12 @@ class QueryJobs:
                 row["data"] = {k: v for k, v in row["data"].items() if k != "raw_records"}
         return result
 
+    @classmethod
+    def _worker_public(cls, job):
+        result = cls._public(job)
+        result["identity_codes"] = dict(job.get("identity_codes", {}))
+        return result
+
     def get(self, job_id):
         self._recover_if_idle()
         return self._public(self._read(job_id))
@@ -139,18 +145,27 @@ class QueryJobs:
         debug_port = params.get("debug_port", 9222)
         if type(debug_port) is not int or not 1024 <= debug_port <= 65535:
             raise QueryError("浏览器调试端口必须是 1024 到 65535 的整数。")
+        execution = params.get("execution", "local")
+        if execution not in {"local", "desktop"}:
+            raise QueryError("运行位置必须选择本机或桌面助手。")
         names = read_names(source, self.inbox)
         previous = params.get("resume_from", "")
         successes = read_previous(previous, names, self.output) if previous else {}
         identity_source = params.get("identity_source", "")
         codes = read_codes(identity_source, names, self.inbox) if identity_source else {}
-        job = {"id": uuid.uuid4().hex, "source_name": source, "created_at": now(),
-               "status": "running", "message": "正在连接查询浏览器。", "current_name": "",
+        job = {"id": uuid.uuid4().hex, "source_name": source, "identity_source": identity_source,
+               "created_at": now(), "execution": execution,
+               "status": "queued" if execution == "desktop" else "running",
+               "message": "等待桌面助手领取任务。" if execution == "desktop" else "正在连接查询浏览器。",
+               "current_name": "",
                "max_new_queries": limit, "delay_seconds": delay, "browser": browser,
                "debug_port": debug_port, "identity_codes": codes,
                "window_id": None, "rows": [successes.get(name) or
                    {"name": name, "status": "pending", "error": ""} for name in names]}
         self._prepare_full(job)
+        if execution == "desktop":
+            self._save(job)
+            return self.get(job["id"])
         lock = self._lock()
         try:
             self._recover()
@@ -166,6 +181,20 @@ class QueryJobs:
                          name="qcc-" + job["id"][:8]).start()
 
     def resume(self, job_id):
+        existing = self._read(job_id)
+        if existing.get("execution") == "desktop":
+            self._prepare_full(existing)
+            if all(row["status"] == "success" for row in existing["rows"]):
+                raise QueryError("该批次全部成功，无需重复查询。")
+            for row in existing["rows"]:
+                if row["status"] != "success":
+                    row.update(status="pending", error="")
+            existing.update(status="queued", worker_id="", worker_heartbeat_at=0,
+                            message="已重新排队，等待桌面助手领取。", current_name="")
+            with self._db() as db:
+                db.execute("UPDATE jobs SET stop=0 WHERE id=?", (job_id,))
+            self._save(existing)
+            return self.get(job_id)
         lock = self._lock()
         try:
             self._recover()
@@ -202,6 +231,74 @@ class QueryJobs:
                 db.execute("UPDATE jobs SET stop=1 WHERE id=?", (job_id,))
             job["message"] = "已请求暂停。当前企业处理结束后保存进度。"
         return job
+
+    def claim_worker(self, worker_id):
+        """Claim one queued desktop job for a named desktop worker."""
+        worker_id = str(worker_id or "").strip()
+        if not worker_id or len(worker_id) > 120:
+            raise QueryError("桌面助手编号无效。")
+        now_epoch = time.time()
+        with self._db() as db:
+            rows = db.execute("SELECT id,payload FROM jobs ORDER BY updated ASC,rowid ASC").fetchall()
+            for row in rows:
+                job = json.loads(row["payload"])
+                if job.get("execution") != "desktop":
+                    continue
+                if job.get("status") == "running" and now_epoch - float(job.get("worker_heartbeat_at", 0) or 0) > 180:
+                    job.update(status="queued", worker_id="", worker_heartbeat_at=0,
+                               message="桌面助手连接中断，已重新排队。", current_name="")
+                if job.get("status") != "queued":
+                    if job.get("status") == "running" and job.get("worker_id") == worker_id:
+                        return self._worker_public(job)
+                    continue
+                job.update(status="running", worker_id=worker_id, worker_heartbeat_at=now_epoch,
+                            message="桌面助手已领取任务，正在启动本机浏览器查询。", current_name="")
+                db.execute("UPDATE jobs SET payload=?,updated=? WHERE id=?",
+                           (json.dumps(job, ensure_ascii=False, allow_nan=False), now(), job["id"]))
+                return self._worker_public(job)
+        return None
+
+    def worker_job(self, job_id, worker_id):
+        job = self._read(job_id)
+        if job.get("execution") != "desktop" or job.get("worker_id") != worker_id:
+            raise QueryError("任务不属于此桌面助手。")
+        return job
+
+    def worker_update(self, job_id, worker_id, update):
+        job = self.worker_job(job_id, worker_id)
+        if not isinstance(update, dict):
+            raise QueryError("桌面助手进度格式不正确。")
+        if update.get("status") not in {"running", "blocked", "paused", "completed", "queued"}:
+            raise QueryError("桌面助手状态不正确。")
+        rows = update.get("rows")
+        if rows is not None:
+            if not isinstance(rows, list) or len(rows) != len(job["rows"]):
+                raise QueryError("桌面助手返回的企业数量不一致。")
+            expected = [row["name"] for row in job["rows"]]
+            if [row.get("name") for row in rows] != expected:
+                raise QueryError("桌面助手返回的企业名单不一致。")
+            job["rows"] = rows
+        for key in ("status", "message", "current_name", "next_navigation_at"):
+            if key in update:
+                job[key] = update[key]
+        job["worker_heartbeat_at"] = time.time()
+        self._save(job)
+        with self._db() as db:
+            stop = bool(db.execute("SELECT stop FROM jobs WHERE id=?", (job_id,)).fetchone()[0])
+        return {"job": self._worker_public(job), "stop": stop}
+
+    def attach_worker_result(self, job_id, worker_id, source_path):
+        job = self.worker_job(job_id, worker_id)
+        source_path = Path(source_path)
+        if not source_path.is_file():
+            raise QueryError("桌面助手结果文件不存在。")
+        target = self.output / f"企查查-批量查询-{job_id}.xlsx"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source_path.replace(target)
+        job["result_file"] = target.name
+        job["worker_heartbeat_at"] = time.time()
+        self._save(job)
+        return self._worker_public(job)
 
     def _stopped(self, job_id):
         with self._db() as db:
@@ -304,6 +401,11 @@ class QueryJobs:
                 lock.close()
 
     def export(self, job_id):
+        job = self._read(job_id)
+        if job.get("result_file"):
+            path = self.output / job["result_file"]
+            if path.is_file():
+                return path
         return export_job(self.get(job_id), self.output)
 
 

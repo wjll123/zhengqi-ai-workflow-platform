@@ -1,7 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   let activeId = '', runningId = '', timer = null, validSource = false, anyRunning = false, previewVersion = 0, browserStatuses = [];
-  const stateLabels = {running:'查询中', blocked:'等待登录或验证', paused:'已暂停', completed:'本轮完成'};
+  const stateLabels = {queued:'等待桌面助手', running:'查询中', blocked:'等待登录或验证', paused:'已暂停', completed:'本轮完成'};
   const rowLabels = {success:'成功', failed:'失败', pending:'待查询', blocked:'待验证', querying:'查询中'};
   async function api(url, options = {}) {
     const response = await fetch(url, options);
@@ -76,12 +76,12 @@
   }
   async function refreshJobs(selectId = '') {
     const data = await api('/api/qcc/jobs');
-    const runningJob = data.jobs.find(job => job.status === 'running');
+    const runningJob = data.jobs.find(job => job.status === 'running' || job.status === 'queued');
     runningId = runningJob?.id || '';
     anyRunning = Boolean(runningJob); startState();
     $('qccActiveNotice').hidden = !runningJob;
     $('qccActiveNotice').textContent = runningJob
-      ? `已有批次在后台运行（已补齐 ${runningJob.counts.full ?? runningJob.counts.success}/${runningJob.counts.total} 家）。${runningJob.message}` : '';
+      ? `已有批次在队列中（已补齐 ${runningJob.counts.full ?? runningJob.counts.success}/${runningJob.counts.total} 家）。${runningJob.message}` : '';
     const old = selectId || activeId;
     const selected = data.jobs.find(job => job.id === old) || runningJob || data.jobs[0];
     $('qccHistory').replaceChildren();
@@ -124,6 +124,11 @@
     return browserStatuses;
   }
   $('qccBrowser').addEventListener('change', showBrowser);
+  $('qccExecution').addEventListener('change', function () {
+    const desktop = this.value === 'desktop';
+    $('qccBrowserCheck').disabled = desktop;
+    $('qccBrowserState').textContent = desktop ? '等待桌面助手在你的电脑上执行。' : '';
+  });
   $('qccBrowserCheck').addEventListener('click', async function () {
     this.disabled = true;
     try { await refreshBrowserStatus(); }
@@ -153,7 +158,7 @@
     }
     this.disabled = true; message('正在创建查询任务…');
     try {
-      if ($('qccBrowser').value !== 'safari') {
+      if ($('qccExecution').value === 'local' && $('qccBrowser').value !== 'safari') {
         const statuses = await refreshBrowserStatus();
         const selected = statuses.find(item => item.browser === $('qccBrowser').value);
         if (!selected?.ready) throw new Error(selected?.message || '浏览器调试连接未就绪。');
@@ -161,6 +166,7 @@
       const data = await api('/api/qcc/jobs', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
         source_name:$('qccSource').value, resume_from:$('qccPrevious').value,
         identity_source:$('qccIdentity').value, browser:$('qccBrowser').value,
+        execution:$('qccExecution').value,
         debug_port:$('qccBrowser').value === 'edge' ? 9223 : 9222,
         max_new_queries, delay_seconds})});
       await refreshJobs(data.job.id); message('任务已启动。可在下方查看进度。');
@@ -184,5 +190,6 @@
     try { await refreshJobs(activeId); } catch (error) { message(error.message); }
   });
   showBrowser();
+  $('qccExecution').dispatchEvent(new Event('change'));
   Promise.all([refreshFiles(), refreshJobs(), refreshBrowserStatus(true)]).catch(error => message(error.message));
 })();

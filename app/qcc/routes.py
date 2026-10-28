@@ -1,9 +1,19 @@
+import uuid
 from flask import Blueprint, jsonify, request, send_file
 from .errors import QueryBusy, QueryError
 from .jobs import jobs
 from .sources import read_names
+from ..core.config import WORKER_TOKEN
 
 bp = Blueprint("qcc", __name__, url_prefix="/api/qcc")
+
+
+def _worker_auth():
+    if not WORKER_TOKEN:
+        return jsonify(ok=False, message="云端尚未配置桌面助手密钥，请先设置 ZQC_WORKER_TOKEN。"), 503
+    if WORKER_TOKEN and request.headers.get("X-ZQC-Worker-Token") != WORKER_TOKEN:
+        return jsonify(ok=False, message="桌面助手认证失败。"), 401
+    return None
 
 
 @bp.errorhandler(QueryError)
@@ -63,3 +73,40 @@ def browser_status():
         status.pop("all_pages", None)
         result.append(status)
     return jsonify(ok=True, browsers=result)
+
+
+@bp.post("/worker/claim")
+def worker_claim():
+    denied = _worker_auth()
+    if denied:
+        return denied
+    worker_id = (request.get_json(silent=True) or {}).get("worker_id", "")
+    return jsonify(ok=True, job=jobs.claim_worker(worker_id))
+
+
+@bp.post("/worker/jobs/<job_id>/update")
+def worker_update(job_id):
+    denied = _worker_auth()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    worker_id = body.pop("worker_id", "")
+    return jsonify(ok=True, **jobs.worker_update(job_id, worker_id, body))
+
+
+@bp.post("/worker/jobs/<job_id>/result")
+def worker_result(job_id):
+    denied = _worker_auth()
+    if denied:
+        return denied
+    worker_id = request.form.get("worker_id", "")
+    uploaded = request.files.get("file")
+    if not uploaded or not uploaded.filename:
+        raise QueryError("桌面助手没有上传结果文件。")
+    temp = jobs.root / ("worker-" + uuid.uuid4().hex + ".xlsx")
+    temp.parent.mkdir(parents=True, exist_ok=True)
+    uploaded.save(temp)
+    try:
+        return jsonify(ok=True, job=jobs.attach_worker_result(job_id, worker_id, temp))
+    finally:
+        temp.unlink(missing_ok=True)

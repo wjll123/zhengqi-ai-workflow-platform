@@ -57,7 +57,7 @@ git commit -m "release: offline-ready platform"
 git push origin main
 ```
 
-Docker / Render 使用 `Dockerfile` 或 `render.yaml` 启动。上线时必须设置 `ZQC_AUTH_USER` 和 `ZQC_AUTH_PASS`，并为 `ZQC_DATA_DIR` 配置持久化磁盘。企查查查询需要平台与已登录浏览器运行在同一台 Mac：优先支持 Chrome/Edge 调试模式，也可使用 Safari。云端服务不能接管用户电脑上的浏览器。
+Docker / Render 使用 `Dockerfile` 或 `render.yaml` 启动。上线时必须设置 `ZQC_AUTH_USER`、`ZQC_AUTH_PASS` 和桌面助手密钥 `ZQC_WORKER_TOKEN`，并为 `ZQC_DATA_DIR` 配置持久化磁盘。企查查查询支持桌面助手模式：云端平台派发工单，安装在一台 Mac 上的助手主动领取任务，使用该 Mac 已登录的 Chrome/Edge/Safari 查询后回传结果；电脑不需要开放浏览器调试端口。部署方式见 [企查查桌面助手部署](docs/企查查桌面助手部署.md)。
 
 Chrome 调试模式：在 Mac 终端执行 `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir="$HOME/.zqc-chrome-debug"`。Edge 将程序路径改为 `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge`、端口改为 `9223`、配置目录改为 `$HOME/.zqc-edge-debug`。在新打开的调试窗口登录企查查、打开 `https://www.qcc.com/`，回到平台点击“检测浏览器连接”。调试配置目录独立于日常浏览器，可能需要重新登录；日常窗口无需关闭。
 
