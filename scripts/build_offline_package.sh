@@ -82,7 +82,12 @@ cat > "$PACKAGE/OFFLINE_INSTALL.md" <<'DOC'
 3. 运行 `./run_offline.sh`，浏览器打开 `http://127.0.0.1:8848`。
 4. 停止服务可按 `Ctrl+C`，或运行 `./stop.sh`。
 
-本包针对 macOS Apple Silicon 构建，包含 Python wheel 缓存和 LibreOffice。企查查查询须在运行平台的 Mac 上使用已登录浏览器；优先支持 Chrome/Edge 调试模式，也可选择 Safari。请在平台的企查查页面查看调试启动命令。
+本包针对 macOS Apple Silicon 构建，包含 Python wheel 缓存和 LibreOffice。企查查查询支持两种方式：
+
+- 本机模式：平台和已登录浏览器在同一台 Mac 上运行。
+- 桌面助手模式：云端平台派发工单，这台 Mac 运行 `桌面查询助手.command`，主动领取工单并使用本机已登录浏览器查询。桌面助手配置见 `docs/企查查桌面助手部署.md`；需要设置 `ZQC_WORKER_TOKEN`、`ZQC_WORKER_SERVER`，以及启用平台鉴权时的 `ZQC_AUTH_USER`、`ZQC_AUTH_PASS`。
+
+Chrome/Edge 需要调试模式，Safari 可直接使用。验证码和风控验证仍由使用者在本机浏览器中处理。
 DOC
 
 chmod +x "$PACKAGE/install_offline.sh" "$PACKAGE/run_offline.sh" "$PACKAGE/start.sh" "$PACKAGE/stop.sh"

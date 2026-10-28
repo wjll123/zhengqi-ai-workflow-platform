@@ -5,4 +5,6 @@
 3. 运行 `./run_offline.sh`，浏览器打开 `http://127.0.0.1:8848`。
 4. 停止服务可按 `Ctrl+C`，或运行 `./stop.sh`。
 
-本包针对 macOS Apple Silicon 构建，包含 Python wheel 缓存和 LibreOffice。企查查查询须在运行平台的 Mac 上使用已登录浏览器；优先支持 Chrome/Edge 调试模式，也可选择 Safari。请在平台的企查查页面查看调试启动命令。
+本包针对 macOS Apple Silicon 构建，包含 Python wheel 缓存和 LibreOffice。企查查查询支持本机模式和桌面助手模式：云端平台派发工单时，在执行电脑运行 `桌面查询助手.command`，它会主动领取工单并使用本机已登录浏览器查询。桌面助手配置见 `docs/企查查桌面助手部署.md`。
+
+Chrome/Edge 需要调试模式，Safari 可直接使用。验证码和风控验证仍由使用者在本机浏览器中处理。
